@@ -25,11 +25,6 @@
         "value": 115200,
         "text": "115200",
         "is_custom": false
-      },
-      {
-        "value": 1000000,
-        "text": "1000000",
-        "is_custom": true
       }
     ],
     "parities": [
@@ -75,10 +70,10 @@
     ]
   },
   "user_settings": {
-    "last_port": "",
-    "last_baudrate": 19200,
-    "last_parity": "N",
-    "last_databits": 8,
-    "last_stopbits": 1
+    "last_port": "COM2",
+    "last_baudrate": "115200",
+    "last_parity": "无校验",
+    "last_databits": "8位",
+    "last_stopbits": "1位"
   }
 }
