@@ -1,0 +1,84 @@
+{
+  "serial_config": {
+    "baudrates": [
+      {
+        "value": 9600,
+        "text": "9600",
+        "is_custom": false
+      },
+      {
+        "value": 19200,
+        "text": "19200",
+        "is_custom": false
+      },
+      {
+        "value": 38400,
+        "text": "38400",
+        "is_custom": false
+      },
+      {
+        "value": 57600,
+        "text": "57600",
+        "is_custom": false
+      },
+      {
+        "value": 115200,
+        "text": "115200",
+        "is_custom": false
+      },
+      {
+        "value": 1000000,
+        "text": "1000000",
+        "is_custom": true
+      }
+    ],
+    "parities": [
+      {
+        "value": "N",
+        "text": "无校验",
+        "is_custom": false
+      },
+      {
+        "value": "O",
+        "text": "奇校验",
+        "is_custom": false
+      },
+      {
+        "value": "E",
+        "text": "偶校验",
+        "is_custom": false
+      }
+    ],
+    "databits": [
+      {
+        "value": 8,
+        "text": "8位",
+        "is_custom": false
+      },
+      {
+        "value": 7,
+        "text": "7位",
+        "is_custom": false
+      }
+    ],
+    "stopbits": [
+      {
+        "value": 1,
+        "text": "1位",
+        "is_custom": false
+      },
+      {
+        "value": 2,
+        "text": "2位",
+        "is_custom": false
+      }
+    ]
+  },
+  "user_settings": {
+    "last_port": "",
+    "last_baudrate": 19200,
+    "last_parity": "N",
+    "last_databits": 8,
+    "last_stopbits": 1
+  }
+}

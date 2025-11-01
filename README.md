@@ -29,8 +29,8 @@ pip install PyQt5==5.15.11
 3. 输入 名称: `Qt Designer Edit`
 4. 输入 描述: `Qt Designer Edit`
 5. 输入 程序: `designer.exe的路径`
-6. 输入 实参: `$FileDir$`
-7. 输入 工作目录: `$FileDir`
+6. 输入 实参: `$FileName$`
+7. 输入 工作目录: `$FileDir$`
 8. 勾选 在执行后同步文件
 9. 勾选 打开工具输出的控制台
 10. 点击 OK 保存设置
@@ -68,4 +68,15 @@ pip install PyQt5==5.15.11
 
 ![快捷键1.png](Readme/%E5%BF%AB%E6%8D%B7%E9%94%AE1.png)
 
+## 常见的控件类型简写
 
+| 控件类型 | 完整写法 | 推荐简写      | 说明 |
+|---------|---------|-----------|------|
+| QComboBox | comboBox | **cb**    | 组合框 |
+| QPushButton | pushButton | **btn**   | 按钮 |
+| QCheckBox | checkBox | **chk**   | 复选框 |
+| QLineEdit | lineEdit | **ledit** | 单行文本框 |
+| QTextEdit | textEdit | **tedit** | 多行文本框 |
+| QLabel | label | **lbl**   | 标签 |
+| QRadioButton | radioButton | **radio** | 单选按钮 |
+| QSpinBox | spinBox | **spin**  | 数字微调框 |

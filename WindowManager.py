@@ -4,9 +4,9 @@ import os
 from PyQt5.QtWidgets import QApplication, QStackedWidget
 
 #加入窗口类
-from Serial_Port.app_SerialWindows import SerialApp_class
+from Serial_Port.app_SerialWindows import SerialAppClass
 
-class WindowManager_class:
+class WindowManagerClass:
 	def __init__(self):
 		self.app = QApplication(sys.argv)
 		self.app.setStyle("Fusion")
@@ -15,14 +15,17 @@ class WindowManager_class:
 		self.stacked_widget = QStackedWidget()
 
 		# 创建窗口
-		self.serial_port_window = SerialApp_class(self)
+		self.serial_port_window = SerialAppClass(self)
 
 		# 添加到堆栈
 		self.stacked_widget.addWidget(self.serial_port_window)
 
 		# 设置初始窗口
 		self.stacked_widget.setCurrentWidget(self.serial_port_window)
-		self.stacked_widget.move(500, 200)
+		# 使用窗口的实际尺寸设置堆栈大小
+		width, height = self.serial_port_window.design_size
+		self.stacked_widget.setFixedSize(width, height)
+		self.stacked_widget.move(240, 135)
 		self.stacked_widget.show()
 
 	def show_main_window(self):
@@ -39,5 +42,5 @@ class WindowManager_class:
 
 # 主入口
 if __name__ == "__main__":
-	manager = WindowManager_class()
+	manager = WindowManagerClass()
 	manager.run()
