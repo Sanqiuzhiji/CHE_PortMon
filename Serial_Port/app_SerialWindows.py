@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from datetime import datetime
+
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QFont, QTextCursor
 from PyQt5.QtWidgets import QMainWindow, QMessageBox, QFileDialog
@@ -35,9 +37,6 @@ class SerialAppClass(QMainWindow):
         # 初始化界面
         self.init_serial_ui()
 
-        # 加载上次的设置
-        self.load_last_settings()
-
         # 初始化端口列表
         self.refresh_ports()
 
@@ -47,6 +46,21 @@ class SerialAppClass(QMainWindow):
         self.port_infor_timer.start(1000)
 
         self.connect_signals()
+
+        # 延迟加载上次设置，确保端口列表已刷新
+        QTimer.singleShot(10, self.load_last_settings)
+
+        # 自动清空相关属性
+        self.receive_data_size = 0
+        self.max_size = 512 * 1024  # 512KB
+        self.auto_clear_timer: QTimer = QTimer()
+        self.auto_clear_timer.timeout.connect(self.comprehensive_auto_clear)
+        self.auto_clear_interval = 100
+
+        # 自动发送相关属性
+        self.is_auto_sending = False
+        self.auto_send_timer: QTimer = QTimer()
+        self.auto_send_timer.timeout.connect(self.auto_send_function)
 
     def init_serial_ui(self):
         """初始化串口界面"""
@@ -97,16 +111,33 @@ class SerialAppClass(QMainWindow):
         self.ui.clear_Send_btn.clicked.connect(self.clear_send_data)
         self.ui.path_send_btn.clicked.connect(self.select_send_file)
         self.ui.sendFile_btn.clicked.connect(self.send_file)
+        self.ui.auto_clearReceive_chb.stateChanged.connect(self.on_auto_clear_changed)
+        self.ui.auto_send_btn.clicked.connect(self.on_auto_send_changed)
+        self.ui.auto_sendTime_lEdit.textChanged.connect(self.on_auto_send_time_changed)
 
-        # 复选框信号
+        # 复选框信号 - 添加自动保存
         self.ui.hex_receive_chb.stateChanged.connect(self.on_hex_receive_changed)
+        self.ui.hex_receive_chb.stateChanged.connect(self.auto_save_settings)
         self.ui.hex_send_chb.stateChanged.connect(self.on_hex_send_changed)
+        self.ui.hex_send_chb.stateChanged.connect(self.auto_save_settings)
         self.ui.timestamp_chb.stateChanged.connect(self.on_timestamp_changed)
+        self.ui.timestamp_chb.stateChanged.connect(self.auto_save_settings)
         self.ui.rts_chb.stateChanged.connect(self.on_flow_control_changed)
+        self.ui.rts_chb.stateChanged.connect(self.auto_save_settings)
         self.ui.dtr_chb.stateChanged.connect(self.on_flow_control_changed)
+        self.ui.dtr_chb.stateChanged.connect(self.auto_save_settings)
+        self.ui.auto_clearReceive_chb.stateChanged.connect(self.auto_save_settings)
 
-        # 端口选择变化信号
-        self.ui.port_cb.currentIndexChanged.connect(self.update_port_info)
+        # 端口和参数变化信号 - 添加自动保存
+        self.ui.port_cb.currentTextChanged.connect(self.auto_save_settings)
+        self.ui.baudrate_cb.currentTextChanged.connect(self.auto_save_settings)
+        self.ui.parity_cb.currentTextChanged.connect(self.auto_save_settings)
+        self.ui.databits_cb.currentTextChanged.connect(self.auto_save_settings)
+        self.ui.stopbits_cb.currentTextChanged.connect(self.auto_save_settings)
+
+    def auto_save_settings(self):
+        """自动保存设置"""
+        self.save_current_settings()
 
     def toggle_serial_port(self):
         """打开/关闭串口"""
@@ -146,15 +177,8 @@ class SerialAppClass(QMainWindow):
             return False
 
     def save_current_settings(self):
-        """保存当前设置"""
-        current_settings = {
-            "last_port": self.ui.port_cb.currentText(),
-            "last_baudrate": self.ui.baudrate_cb.currentText(),
-            "last_parity": self.ui.parity_cb.currentText(),
-            "last_databits": self.ui.databits_cb.currentText(),
-            "last_stopbits": self.ui.stopbits_cb.currentText()
-        }
-        self.config_manager.save_user_settings(current_settings)
+        """保存当前所有设置"""
+        self.config_manager.save_all_settings(self)
 
     def get_databits_value(self):
         """获取数据位数值"""
@@ -189,6 +213,10 @@ class SerialAppClass(QMainWindow):
 
     def on_data_received(self, data):
         """处理接收到的数据"""
+
+        # 更新接收数据大小
+        self.receive_data_size += len(data)
+
         if self.ui.hex_receive_chb.isChecked():
             # 十六进制显示
             hex_data = data.toHex().data().decode()
@@ -207,11 +235,6 @@ class SerialAppClass(QMainWindow):
         # 追加到接收文本框
         self.append_to_receive(display_text)
 
-        # 自动清空
-        if self.ui.auto_clearReceive_chb.isChecked():
-            # 这里可以添加自动清空的逻辑，比如达到一定行数后清空
-            pass
-
     def append_to_receive(self, text):
         """将文本追加到接收文本框"""
         cursor = self.ui.receive_tEdit.textCursor()
@@ -222,16 +245,19 @@ class SerialAppClass(QMainWindow):
 
     def send_data(self):
         """发送数据"""
+        if not self.serial_process.is_open:
+            QMessageBox.warning(self, "提示", "请先打开串口")
+            return
+
         send_text = self.ui.send_tEdit.toPlainText()
-        if not send_text.strip():
+        if not send_text:
             QMessageBox.information(self, "提示", "请输入要发送的数据")
             return
 
         is_hex = self.ui.hex_send_chb.isChecked()
         if self.serial_process.send_data(send_text, is_hex):
-            # 发送成功，可选自动清空
-            if self.ui.auto_send_chb.isChecked():
-                self.ui.send_tEdit.clear()
+            # 发送成功
+            pass
 
     def send_file(self):
         """发送文件"""
@@ -241,7 +267,7 @@ class SerialAppClass(QMainWindow):
             return
 
         if self.serial_process.send_file(file_path):
-            QMessageBox.information(self, "成功", "文件发送完成")
+            self.ui.statusbar.showMessage("文件发送完成", 1000)  # 显示3秒
 
     def clear_receive_data(self):
         """清空接收数据"""
@@ -250,6 +276,9 @@ class SerialAppClass(QMainWindow):
 
     def clear_send_data(self):
         """清空发送数据"""
+        current_text = self.ui.auto_send_btn.text()
+        if current_text == "停止自动发送":
+            self.on_auto_send_changed()
         self.ui.send_tEdit.clear()
 
     def toggle_pause_receive(self):
@@ -263,26 +292,42 @@ class SerialAppClass(QMainWindow):
 
     def save_receive_data(self):
         """保存接收数据"""
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, "保存接收数据", "", "文本文件 (*.txt);;所有文件 (*)"
-        )
+        # 先检查是否有预设的保存路径
+        preset_path = self.ui.file_receive_lEdit.text().strip()
 
-        if file_path:
+        if preset_path:
+            # 使用预设路径直接保存
             try:
-                with open(file_path, 'w', encoding='utf-8') as f:
+                with open(preset_path, 'w', encoding='utf-8') as f:
                     f.write(self.ui.receive_tEdit.toPlainText())
-                QMessageBox.information(self, "成功", "数据已保存")
+                QMessageBox.information(self, "成功", f"数据已保存到: {preset_path}")
             except Exception as e:
                 QMessageBox.critical(self, "错误", f"保存失败: {e}")
+        else:
+            # 没有预设路径，弹出文件选择对话框
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "保存接收数据", "", "文本文件 (*.txt);;所有文件 (*)"
+            )
+
+            if file_path:
+                try:
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(self.ui.receive_tEdit.toPlainText())
+                    QMessageBox.information(self, "成功", "数据已保存")
+                except Exception as e:
+                    QMessageBox.critical(self, "错误", f"保存失败: {e}")
 
     def select_receive_path(self):
         """选择接收数据保存路径"""
+        default_name = f"serial_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+
         file_path, _ = QFileDialog.getSaveFileName(
-            self, "设置接收数据保存路径", "", "文本文件 (*.txt)"
+            self, "设置接收数据保存路径", default_name, "文本文件 (*.txt)"
         )
 
         if file_path:
             self.ui.file_receive_lEdit.setText(file_path)
+            self.auto_save_settings()
 
     def select_send_file(self):
         """选择发送文件"""
@@ -292,11 +337,16 @@ class SerialAppClass(QMainWindow):
 
         if file_path:
             self.ui.file_send_lEdit.setText(file_path)
+            self.auto_save_settings()  # 自动保存
 
     def on_hex_receive_changed(self, state):
         """十六进制接收显示切换"""
-        # 可以在这里添加切换显示模式的逻辑
-        pass
+
+        # 控制自动清空定时器
+        if self.ui.auto_clearReceive_chb.isChecked():
+            self.auto_clear_timer.start(self.auto_clear_interval)
+        else:
+            self.auto_clear_timer.stop()
 
     def on_hex_send_changed(self, state):
         """十六进制发送切换"""
@@ -400,24 +450,48 @@ class SerialAppClass(QMainWindow):
         print("打开串口:", current_settings)
 
     def load_last_settings(self):
-        """加载上次的设置"""
+        """加载上次的所有设置"""
         last_settings = self.config_manager.load_user_settings()
 
-        # 设置到界面
-        self.ui.port_cb.setCurrentText(last_settings.get("last_port", "COM1"))
+        # 加载串口设置 - 智能选择端口
+        serial_settings = last_settings.get("serial", {})
+        saved_port = serial_settings.get("port", "")
 
-        # 设置波特率（需要检查是否存在）
-        last_baudrate = last_settings.get("last_baudrate", 115200)
-        index = self.ui.baudrate_cb.findData(last_baudrate)
-        if index >= 0:
-            self.ui.baudrate_cb.setCurrentIndex(index)
+        # 智能选择端口：如果保存的端口可用则使用，否则使用第一个可用端口
+        if saved_port and self.config_manager.is_port_available(saved_port):
+            self.ui.port_cb.setCurrentText(saved_port)
         else:
-            self.ui.baudrate_cb.setCurrentText(str(last_baudrate))
+            # 获取第一个可用端口
+            available_port = self.config_manager.get_available_port()
+            if available_port:
+                self.ui.port_cb.setCurrentText(available_port)
 
-        # 设置其他参数...
-        self.set_comboBox_currentData(self.ui.parity_cb, last_settings.get("last_parity", "N"))
-        self.set_comboBox_currentData(self.ui.databits_cb, last_settings.get("last_databits", 8))
-        self.set_comboBox_currentData(self.ui.stopbits_cb, last_settings.get("last_stopbits", 1))
+        # 加载其他串口参数
+        self.ui.baudrate_cb.setCurrentText(serial_settings.get("baudrate", "115200"))
+        self.ui.parity_cb.setCurrentText(serial_settings.get("parity", "无"))
+        self.ui.databits_cb.setCurrentText(serial_settings.get("databits", "8"))
+        self.ui.stopbits_cb.setCurrentText(serial_settings.get("stopbits", "1"))
+
+        # 加载发送设置
+        send_settings = last_settings.get("send", {})
+        self.ui.hex_send_chb.setChecked(send_settings.get("hex_send", False))
+        self.ui.auto_send_btn.setText("启动自动发送")
+
+        # 加载接收设置
+        receive_settings = last_settings.get("receive", {})
+        self.ui.hex_receive_chb.setChecked(receive_settings.get("hex_receive", False))
+        self.ui.timestamp_chb.setChecked(receive_settings.get("timestamp", False))
+        self.ui.auto_clearReceive_chb.setChecked(receive_settings.get("auto_clear_receive", False))
+
+        # 加载流控制
+        flow_control = last_settings.get("flow_control", {})
+        self.ui.rts_chb.setChecked(flow_control.get("rts", False))
+        self.ui.dtr_chb.setChecked(flow_control.get("dtr", False))
+
+        # 加载文件路径
+        file_paths = last_settings.get("file_paths", {})
+        self.ui.file_receive_lEdit.setText(file_paths.get("receive_save", ""))
+        self.ui.file_send_lEdit.setText(file_paths.get("send_file", ""))
 
     def set_comboBox_currentData(self, combo_box, data_value):
         """根据数据值设置组合框选中项"""
@@ -427,7 +501,6 @@ class SerialAppClass(QMainWindow):
 
     def refresh_ports(self):
         """刷新串口列表"""
-
         # 获取当前所有端口
         current_ports = [port.portName() for port in QSerialPortInfo.availablePorts()]
 
@@ -448,17 +521,32 @@ class SerialAppClass(QMainWindow):
         for port_name in current_ports:
             self.ui.port_cb.addItem(port_name)
 
-        # 如果之前有选择，尝试恢复选择
-        if current_selection and current_selection in current_ports:
-            index = self.ui.port_cb.findText(current_selection)
-            if index >= 0:
-                self.ui.port_cb.setCurrentIndex(index)
-                # 更新信息显示
-                self.update_port_info(index)
-
         # 如果没有端口，显示提示
         if len(current_ports) == 0:
             self.ui.port_cb.addItem("未检测到串口")
+            self.ui.port_info_lEdit.setPlainText("未检测到可用串口设备")
+            return
+
+        # 智能选择端口
+        if current_selection and current_selection in current_ports:
+            # 如果之前选择的端口仍然存在，保持选择
+            index = self.ui.port_cb.findText(current_selection)
+            if index >= 0:
+                self.ui.port_cb.setCurrentIndex(index)
+        else:
+            # 否则尝试使用保存的端口
+            last_settings = self.config_manager.load_user_settings()
+            saved_port = last_settings.get("serial", {}).get("port", "")
+            if saved_port and saved_port in current_ports:
+                index = self.ui.port_cb.findText(saved_port)
+                if index >= 0:
+                    self.ui.port_cb.setCurrentIndex(index)
+            else:
+                # 否则选择第一个端口
+                self.ui.port_cb.setCurrentIndex(0)
+
+        # 更新信息显示
+        self.update_port_info(self.ui.port_cb.currentIndex())
 
     def get_port_info(self, port_name):
         """获取端口详细信息"""
@@ -491,7 +579,7 @@ class SerialAppClass(QMainWindow):
 
     def update_port_info(self, index):
         """更新端口信息显示"""
-        if index >= 0:
+        if index > 0:
             port_name = self.ui.port_cb.currentText()
             if port_name != "未检测到串口":
                 port_info = self.get_port_info(port_name)
@@ -500,6 +588,77 @@ class SerialAppClass(QMainWindow):
                 self.ui.port_info_lEdit.setPlainText("未检测到可用串口设备")
         else:
             self.ui.port_info_lEdit.setPlainText("未选择串口设备")
+
+    def on_auto_clear_changed(self, state):
+        """自动清空复选框状态改变"""
+        if state:
+            self.auto_clear_timer.start(self.auto_clear_interval)
+        else:
+            self.auto_clear_timer.stop()
+
+    def on_auto_send_changed(self):
+        """自动发送按钮状态改变"""
+        current_text = self.ui.auto_send_btn.text()
+
+        if current_text == "启动自动发送":
+            """启动自动发送"""
+            if not self.serial_process.is_open:
+                QMessageBox.warning(self, "错误", "请先打开串口")
+                return
+
+            send_text = self.ui.send_tEdit.toPlainText()
+            if not send_text:
+                QMessageBox.warning(self, "提示", "请输入要发送的数据")
+                return
+
+            try:
+                interval_text = self.ui.auto_sendTime_lEdit.text().strip()
+                if not interval_text:
+                    QMessageBox.warning(self, "提示", "请输入发送间隔时间")
+                    return
+
+                interval_ms = int(interval_text)
+
+                if interval_ms < 10:
+                    QMessageBox.warning(self, "提示", "发送间隔太短，请设置至少10毫秒")
+                    return
+
+                # 启动定时器
+                self.auto_send_timer.start(interval_ms)
+                self.is_auto_sending = True
+                self.ui.auto_send_btn.setText("停止自动发送")
+
+            except ValueError:
+                QMessageBox.warning(self, "错误", "请输入有效的数字")
+
+        elif current_text == "停止自动发送":
+            """停止自动发送"""
+            self.auto_send_timer.stop()
+            self.is_auto_sending = False
+            self.ui.auto_send_btn.setText("启动自动发送")
+
+    def comprehensive_auto_clear(self):
+        """综合自动清空策略"""
+        if self.receive_data_size > self.max_size:
+            self.ui.receive_tEdit.clear()
+            self.receive_data_size = 0
+
+    def auto_send_function(self):
+        """自动发送数据"""
+        self.send_data()
+
+    def on_auto_send_time_changed(self, text):
+        """自动发送间隔时间改变"""
+        if text.strip():  # 非空输入
+            try:
+                interval_ms = int(text)
+                if interval_ms < 10:
+                    QMessageBox.warning(self, "提示", "发送间隔太短，请设置至少10毫秒")
+                    self.ui.auto_sendTime_lEdit.setText("10")
+                else:
+                    self.auto_send_timer.start(interval_ms)
+            except ValueError:
+                pass  # 输入的不是数字
 
     def closeEvent(self, event):
         """关闭时停止定时器"""

@@ -469,15 +469,15 @@
        </widget>
       </item>
       <item>
-       <widget class="QCheckBox" name="auto_send_chb">
+       <widget class="QPushButton" name="auto_send_btn">
         <property name="font">
          <font>
           <family>楷体</family>
-          <pointsize>14</pointsize>
+          <pointsize>16</pointsize>
          </font>
         </property>
         <property name="text">
-         <string>自动发送</string>
+         <string>启动自动发送</string>
         </property>
        </widget>
       </item>

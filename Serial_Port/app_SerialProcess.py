@@ -1,8 +1,7 @@
 # serial_process.py
 # -*- coding: utf-8 -*-
-from PyQt5.QtCore import QObject, pyqtSignal, QTimer, QIODevice
+from PyQt5.QtCore import QObject, pyqtSignal, QTimer, QIODevice, QByteArray
 from PyQt5.QtSerialPort import QSerialPort, QSerialPortInfo
-import time
 import os
 
 
@@ -10,9 +9,9 @@ class SerialProcess(QObject):
     """串口处理类"""
 
     # 定义信号
-    data_received = pyqtSignal(object)  # 修改为 object 类型
-    port_opened = pyqtSignal(object)  # 串口打开信号
-    port_closed = pyqtSignal(object)  # 串口关闭信号
+    data_received = pyqtSignal(QByteArray)
+    port_opened = pyqtSignal()  # 串口打开信号
+    port_closed = pyqtSignal()  # 串口关闭信号
     error_occurred = pyqtSignal(str)  # 错误发生信号
 
     def __init__(self):
@@ -52,11 +51,16 @@ class SerialProcess(QObject):
                 self.port_opened.emit()
                 return True
             else:
-                self.error_occurred.emit(f"无法打开串口 {port_name}")
+                error_msg = f"无法打开串口 {port_name}"
+                print(error_msg)  # 调试信息
+                self.error_occurred.emit(error_msg)
                 return False
 
+
         except Exception as e:
-            self.error_occurred.emit(f"打开串口错误: {str(e)}")
+            error_msg = f"打开串口错误: {str(e)}"
+            print(error_msg)  # 调试信息
+            self.error_occurred.emit(error_msg)
             return False
 
     def close_port(self):
@@ -153,6 +157,10 @@ class SerialProcess(QObject):
 
     def handle_error(self, error):
         """处理串口错误"""
+        # 忽略 NoError 情况
+        if error == QSerialPort.SerialPortError.NoError:
+            return
+
         error_str = ""
         if error == QSerialPort.SerialPortError.ResourceError:
             error_str = "资源错误，串口可能被拔出"
@@ -160,13 +168,25 @@ class SerialProcess(QObject):
             error_str = "权限错误，无法访问串口"
         elif error == QSerialPort.SerialPortError.OpenError:
             error_str = "打开串口错误"
+        elif error == QSerialPort.SerialPortError.WriteError:
+            error_str = "写入串口错误"
+        elif error == QSerialPort.SerialPortError.ReadError:
+            error_str = "读取串口错误"
+        elif error == QSerialPort.SerialPortError.UnknownError:
+            error_str = "未知串口错误"
         else:
             error_str = f"串口错误: {self.serial.errorString()}"
 
-        self.error_occurred.emit(error_str)
+        # 只有当有实际错误时才发射信号
+        if error_str:
+            self.error_occurred.emit(error_str)
 
-        # 如果串口打开时发生错误，关闭串口
-        if self.serial.isOpen():
+        # 如果串口打开时发生严重错误，关闭串口
+        if self.serial.isOpen() and error in [
+            QSerialPort.SerialPortError.ResourceError,
+            QSerialPort.SerialPortError.PermissionError,
+            QSerialPort.SerialPortError.OpenError
+        ]:
             self.close_port()
 
     def get_port_info(self, port_name):
