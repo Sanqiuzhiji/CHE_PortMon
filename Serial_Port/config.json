@@ -76,7 +76,7 @@
     "last_databits": "8位",
     "last_stopbits": "1位",
     "serial": {
-      "port": "COM4",
+      "port": "COM3",
       "baudrate": "115200",
       "parity": "无校验",
       "databits": "8位",

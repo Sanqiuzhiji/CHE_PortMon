@@ -16,19 +16,14 @@
     <verstretch>0</verstretch>
    </sizepolicy>
   </property>
+  <property name="cursor">
+   <cursorShape>ArrowCursor</cursorShape>
+  </property>
   <property name="windowTitle">
    <string>MainWindow</string>
   </property>
   <property name="toolTipDuration">
    <number>-1</number>
-  </property>
-  <property name="styleSheet">
-   <string notr="true">QGroupBox {
-    background-color: #f0f0f0;
-    border: 1px solid #cccccc;
-    border-radius: 5px;
-    margin-top: 0ex;
-}</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <property name="sizePolicy">
@@ -43,7 +38,7 @@
       <x>20</x>
       <y>20</y>
       <width>221</width>
-      <height>321</height>
+      <height>361</height>
      </rect>
     </property>
     <property name="sizePolicy">
@@ -73,9 +68,9 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>30</y>
+       <y>40</y>
        <width>201</width>
-       <height>276</height>
+       <height>299</height>
       </rect>
      </property>
      <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,0,0,0,0,0">
@@ -260,11 +255,17 @@
    <widget class="QGroupBox" name="groupBox_2">
     <property name="geometry">
      <rect>
-      <x>260</x>
+      <x>250</x>
       <y>20</y>
-      <width>231</width>
-      <height>321</height>
+      <width>261</width>
+      <height>361</height>
      </rect>
+    </property>
+    <property name="sizePolicy">
+     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+      <horstretch>0</horstretch>
+      <verstretch>0</verstretch>
+     </sizepolicy>
     </property>
     <property name="font">
      <font>
@@ -287,8 +288,8 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>30</y>
-       <width>211</width>
+       <y>50</y>
+       <width>244</width>
        <height>271</height>
       </rect>
      </property>
@@ -422,11 +423,17 @@
    <widget class="QGroupBox" name="groupBox_3">
     <property name="geometry">
      <rect>
-      <x>510</x>
+      <x>520</x>
       <y>20</y>
-      <width>231</width>
-      <height>321</height>
+      <width>291</width>
+      <height>361</height>
      </rect>
+    </property>
+    <property name="sizePolicy">
+     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+      <horstretch>0</horstretch>
+      <verstretch>0</verstretch>
+     </sizepolicy>
     </property>
     <property name="font">
      <font>
@@ -450,23 +457,40 @@
       <rect>
        <x>10</x>
        <y>30</y>
-       <width>211</width>
-       <height>281</height>
+       <width>266</width>
+       <height>322</height>
       </rect>
      </property>
      <layout class="QVBoxLayout" name="verticalLayout_4">
       <item>
-       <widget class="QCheckBox" name="hex_send_chb">
-        <property name="font">
-         <font>
-          <family>楷体</family>
-          <pointsize>14</pointsize>
-         </font>
-        </property>
-        <property name="text">
-         <string>十六进制</string>
-        </property>
-       </widget>
+       <layout class="QHBoxLayout" name="horizontalLayout_9">
+        <item>
+         <widget class="QCheckBox" name="hex_send_chb">
+          <property name="font">
+           <font>
+            <family>楷体</family>
+            <pointsize>14</pointsize>
+           </font>
+          </property>
+          <property name="text">
+           <string>十六进制</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QCheckBox" name="visualize_newlines_chb">
+          <property name="font">
+           <font>
+            <family>楷体</family>
+            <pointsize>14</pointsize>
+           </font>
+          </property>
+          <property name="text">
+           <string>高亮末行</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </item>
       <item>
        <widget class="QPushButton" name="auto_send_btn">
@@ -577,10 +601,16 @@
     <property name="geometry">
      <rect>
       <x>20</x>
-      <y>350</y>
-      <width>421</width>
-      <height>341</height>
+      <y>380</y>
+      <width>431</width>
+      <height>351</height>
      </rect>
+    </property>
+    <property name="sizePolicy">
+     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+      <horstretch>0</horstretch>
+      <verstretch>0</verstretch>
+     </sizepolicy>
     </property>
     <property name="font">
      <font>
@@ -603,8 +633,8 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>30</y>
-       <width>400</width>
+       <y>40</y>
+       <width>411</width>
        <height>300</height>
       </rect>
      </property>
@@ -616,11 +646,17 @@
    <widget class="QGroupBox" name="groupBox_5">
     <property name="geometry">
      <rect>
-      <x>450</x>
-      <y>350</y>
-      <width>291</width>
-      <height>341</height>
+      <x>460</x>
+      <y>380</y>
+      <width>351</width>
+      <height>351</height>
      </rect>
+    </property>
+    <property name="sizePolicy">
+     <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+      <horstretch>0</horstretch>
+      <verstretch>0</verstretch>
+     </sizepolicy>
     </property>
     <property name="font">
      <font>
@@ -643,10 +679,19 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>30</y>
-       <width>271</width>
+       <y>40</y>
+       <width>331</width>
        <height>300</height>
       </rect>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">        QTextEdit {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;  /* 等宽字体 */
+            line-height: 1.4;  /* 增加行高 */
+        }</string>
      </property>
     </widget>
    </widget>
@@ -657,7 +702,7 @@
      <x>0</x>
      <y>0</y>
      <width>1400</width>
-     <height>23</height>
+     <height>27</height>
     </rect>
    </property>
   </widget>
