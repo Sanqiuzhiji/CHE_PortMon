@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1400</width>
+    <width>1000</width>
     <height>810</height>
    </rect>
   </property>
@@ -477,19 +477,6 @@
           </property>
          </widget>
         </item>
-        <item>
-         <widget class="QCheckBox" name="visualize_newlines_chb">
-          <property name="font">
-           <font>
-            <family>楷体</family>
-            <pointsize>14</pointsize>
-           </font>
-          </property>
-          <property name="text">
-           <string>高亮末行</string>
-          </property>
-         </widget>
-        </item>
        </layout>
       </item>
       <item>
@@ -701,8 +688,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1400</width>
-     <height>27</height>
+     <width>1000</width>
+     <height>23</height>
     </rect>
    </property>
   </widget>

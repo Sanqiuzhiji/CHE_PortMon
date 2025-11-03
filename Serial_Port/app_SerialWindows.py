@@ -2,10 +2,10 @@
 from datetime import datetime
 
 # 正确的导入方式
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtCore
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QFont, QTextCursor
-from PyQt5.QtWidgets import QMainWindow, QMessageBox, QFileDialog, QCheckBox, QPushButton
+from PyQt5.QtWidgets import QMainWindow, QMessageBox, QFileDialog, QTextEdit
 from PyQt5.QtSerialPort import QSerialPort, QSerialPortInfo
 
 from Serial_Port.Serial_MainWindow import Ui_Serial_MainWindow
@@ -90,6 +90,9 @@ class SerialAppClass(QMainWindow):
 
         # 发送文本框
         self.ui.send_tEdit.setFont(QFont("Consolas", 10))
+        # 添加焦点事件监听
+        self.ui.send_tEdit.focusInEvent = self.send_text_edit_focus_in
+        self.ui.send_tEdit.focusOutEvent = self.send_text_edit_focus_out
 
         # 端口信息文本框
         self.ui.port_info_lEdit.setReadOnly(True)
@@ -252,15 +255,23 @@ class SerialAppClass(QMainWindow):
             QMessageBox.warning(self, "提示", "请先打开串口")
             return
 
-        send_text = self.ui.send_tEdit.toPlainText()
-        if not send_text:
+        # 确保获取的是原始文本（不是显示模式）
+        if not self.ui.send_tEdit.hasFocus():
+            # 如果当前是显示模式，先切换到编辑模式获取文本
+            original_text = self.get_original_text_from_display()
+        else:
+            # 当前是编辑模式，直接获取文本
+            original_text = self.ui.send_tEdit.toPlainText()
+
+        if not original_text:
             QMessageBox.information(self, "提示", "请输入要发送的数据")
             return
 
         is_hex = self.ui.hex_send_chb.isChecked()
-        if self.serial_process.send_data(send_text, is_hex):
-            # 发送成功
-            pass
+        if self.serial_process.send_data(original_text, is_hex):
+            # 发送成功后，如果光标不在发送框，保持显示模式
+            if not self.ui.send_tEdit.hasFocus():
+                self.format_to_display_mode()
 
     def send_file(self):
         """发送文件"""
@@ -664,6 +675,74 @@ class SerialAppClass(QMainWindow):
                     self.auto_send_timer.start(interval_ms)
             except ValueError:
                 pass  # 输入的不是数字
+
+    def send_text_edit_focus_in(self, event):
+        """发送文本框获得焦点 - 显示实际换行"""
+        # 先调用父类方法
+        QTextEdit.focusInEvent(self.ui.send_tEdit, event)
+        # print("send_text_edit_focus_in")
+        # 从格式化显示恢复为实际文本
+        self.restore_actual_text()
+
+    def send_text_edit_focus_out(self, event):
+        """发送文本框失去焦点 - 显示[\n]标记"""
+        # 先调用父类方法
+        QTextEdit.focusOutEvent(self.ui.send_tEdit, event)
+        # print("send_text_edit_focus_out")
+        # 格式化为显示模式
+        self.format_to_display_mode()
+
+    def restore_actual_text(self):
+        """恢复实际文本显示（编辑模式）"""
+        # 获取原始文本
+        original_text = self.ui.send_tEdit.toPlainText()
+        # print("original_text", original_text)
+        lines = original_text.split('[\\n]')
+        # print("lines", lines)
+        lines_pure = [line.replace('\n', '') for line in lines]
+        print("lines_pure", lines_pure)
+        display_text = '\n'.join(lines_pure)
+        # 更新文本框显示实际换行
+        self.ui.send_tEdit.blockSignals(True)
+        self.ui.send_tEdit.setPlainText(display_text)
+        self.ui.send_tEdit.blockSignals(False)
+
+    def format_to_display_mode(self):
+        """格式化为显示模式（非编辑模式）"""
+        actual_text = self.ui.send_tEdit.toPlainText()
+        # print("actual_text", actual_text)
+        # 按真正的换行符分割文本
+        lines = actual_text.split('\n')
+        display_lines = []
+        # print("lines", lines)
+        line_number = 0
+
+        if all(line == '' for line in lines):
+            for i in range(0, len(lines) - 1):
+                display_lines.append('[\\n]\n')
+        else:
+            # 处理开头的空行
+            for line_number, line in enumerate(lines):
+                if line == '':
+                    display_lines.append('[\\n]\n')
+                else:
+                    break
+            # 从 line_number 开始继续处理剩余行
+            for i in range(line_number, len(lines)):
+                line = lines[i]
+                if line != '' :
+                    if i < len(lines) - 1:
+                        display_lines.append(line + '\n')
+                    else:
+                        display_lines.append(line)
+                else:
+                    display_lines.append('[\\n]\n')
+
+        display_text = ''.join(display_lines)
+        # print("display_text", display_text)
+        self.ui.send_tEdit.blockSignals(True)
+        self.ui.send_tEdit.setPlainText(display_text)
+        self.ui.send_tEdit.blockSignals(False)
 
     def closeEvent(self, event):
         """关闭时停止定时器"""
