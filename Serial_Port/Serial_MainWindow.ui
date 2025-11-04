@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1000</width>
+    <width>1129</width>
     <height>810</height>
    </rect>
   </property>
@@ -372,7 +372,7 @@
        </widget>
       </item>
       <item>
-       <widget class="QPushButton" name="pause_Receive_btn">
+       <widget class="QPushButton" name="pause_receive_btn">
         <property name="font">
          <font>
           <family>楷体</family>
@@ -405,7 +405,7 @@
        </widget>
       </item>
       <item>
-       <widget class="QPushButton" name="save_Receive_btn">
+       <widget class="QPushButton" name="save_receive_btn">
         <property name="font">
          <font>
           <family>楷体</family>
@@ -477,6 +477,9 @@
           </property>
          </widget>
         </item>
+        <item>
+         <widget class="QComboBox" name="send_mode_cb"/>
+        </item>
        </layout>
       </item>
       <item>
@@ -502,19 +505,6 @@
         </property>
         <property name="text">
          <string>手动发送</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QPushButton" name="clear_Send_btn">
-        <property name="font">
-         <font>
-          <family>楷体</family>
-          <pointsize>16</pointsize>
-         </font>
-        </property>
-        <property name="text">
-         <string>清空发送</string>
         </property>
        </widget>
       </item>
@@ -590,7 +580,7 @@
       <x>20</x>
       <y>380</y>
       <width>431</width>
-      <height>351</height>
+      <height>361</height>
      </rect>
     </property>
     <property name="sizePolicy">
@@ -622,7 +612,7 @@
        <x>10</x>
        <y>40</y>
        <width>411</width>
-       <height>300</height>
+       <height>311</height>
       </rect>
      </property>
      <property name="readOnly">
@@ -636,7 +626,7 @@
       <x>460</x>
       <y>380</y>
       <width>351</width>
-      <height>351</height>
+      <height>361</height>
      </rect>
     </property>
     <property name="sizePolicy">
@@ -666,7 +656,7 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>40</y>
+       <y>30</y>
        <width>330</width>
        <height>145</height>
       </rect>
@@ -685,7 +675,7 @@
      <property name="geometry">
       <rect>
        <x>10</x>
-       <y>190</y>
+       <y>210</y>
        <width>330</width>
        <height>145</height>
       </rect>
@@ -700,6 +690,57 @@
         }</string>
      </property>
     </widget>
+    <widget class="QWidget" name="horizontalLayoutWidget">
+     <property name="geometry">
+      <rect>
+       <x>30</x>
+       <y>180</y>
+       <width>293</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_10">
+      <item>
+       <widget class="QPushButton" name="clear_Send_btn">
+        <property name="font">
+         <font>
+          <family>楷体</family>
+          <pointsize>12</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>清空字符串</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="send_sync_rbtn">
+        <property name="font">
+         <font>
+          <family>楷体</family>
+          <pointsize>12</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>下同步上</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="clear_Send_hex_btn">
+        <property name="font">
+         <font>
+          <family>楷体</family>
+          <pointsize>12</pointsize>
+         </font>
+        </property>
+        <property name="text">
+         <string>清空十六制</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
    </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
@@ -707,8 +748,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1000</width>
-     <height>27</height>
+     <width>1129</width>
+     <height>23</height>
     </rect>
    </property>
   </widget>

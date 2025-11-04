@@ -70,13 +70,14 @@ pip install PyQt5==5.15.11
 
 ## 常见的控件类型简写
 
-| 控件类型 | 完整写法 | 推荐简写      | 说明 |
-|---------|---------|-----------|------|
-| QComboBox | comboBox | **cb**    | 组合框 |
-| QPushButton | pushButton | **btn**   | 按钮 |
-| QCheckBox | checkBox | **chk**   | 复选框 |
-| QLineEdit | lineEdit | **ledit** | 单行文本框 |
-| QTextEdit | textEdit | **tedit** | 多行文本框 |
-| QLabel | label | **lbl**   | 标签 |
+| 控件类型         | 完整写法 | 推荐简写      | 说明 |
+|--------------|---------|-----------|------|
+| QComboBox    | comboBox | **cb**    | 组合框 |
+| QPushButton  | pushButton | **btn**   | 按钮 |
+| QCheckBox    | checkBox | **chk**   | 复选框 |
+| QLineEdit    | lineEdit | **ledit** | 单行文本框 |
+| QTextEdit    | textEdit | **tedit** | 多行文本框 |
+| QLabel       | label | **lbl**   | 标签 |
 | QRadioButton | radioButton | **radio** | 单选按钮 |
-| QSpinBox | spinBox | **spin**  | 数字微调框 |
+| QSpinBox     | spinBox | **spin**  | 数字微调框 |
+| QRadioButton | radioButton | **rbtn** |  |
