@@ -93,6 +93,34 @@ class SerialAppClass(QMainWindow):
 
 		# 发送文本框
 		self.ui.send_tEdit.setFont(QFont("Consolas", 10))
+		# 添加背景图片（不影响输入）
+		self.ui.send_tEdit.setStyleSheet("""
+		    QTextEdit {
+		        background-image: url(Serial_Port/source/send_tEdit_bg.png);
+		        background-position: center;
+		        background-repeat: no-repeat;
+		        background-attachment: fixed;
+		        background-origin: content;
+		        background-clip: content;
+		    }
+		    QTextEdit:focus {
+		        border: 2px solid #0078d4;
+		    }
+		""")
+		# 添加背景图片（不影响输入）
+		self.ui.send_hex_tEdit.setStyleSheet("""
+		    QTextEdit {
+		        background-image: url(Serial_Port/source/send_hex_tEdit_bg.png);
+		        background-position: center;
+		        background-repeat: no-repeat;
+		        background-attachment: fixed;
+		        background-origin: content;
+		        background-clip: content;
+		    }
+		    QTextEdit:focus {
+		        border: 2px solid #0078d4;
+		    }
+		""")
 		# 添加焦点事件监听
 		self.ui.send_tEdit.focusInEvent = self.send_text_edit_focus_in
 		self.ui.send_tEdit.focusOutEvent = self.send_text_edit_focus_out
@@ -689,7 +717,7 @@ class SerialAppClass(QMainWindow):
 	def restore_actual_text(self):
 		"""恢复实际文本显示（编辑模式）"""
 		# 还原实际文本
-		print("actual_text:",self.actual_text)
+		# print("actual_text:",self.actual_text)
 		self.ui.send_tEdit.setPlainText(self.actual_text)
 
 	def format_to_display_mode(self):

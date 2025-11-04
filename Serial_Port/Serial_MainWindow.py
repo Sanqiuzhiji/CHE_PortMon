@@ -381,7 +381,7 @@ class Ui_Serial_MainWindow(object):
 "}")
         self.groupBox_5.setObjectName("groupBox_5")
         self.send_tEdit = QtWidgets.QTextEdit(self.groupBox_5)
-        self.send_tEdit.setGeometry(QtCore.QRect(10, 40, 331, 300))
+        self.send_tEdit.setGeometry(QtCore.QRect(10, 40, 330, 145))
         self.send_tEdit.setStyleSheet("        QTextEdit {\n"
 "            background-color: #f8f9fa;\n"
 "            border: 1px solid #dee2e6;\n"
@@ -390,9 +390,19 @@ class Ui_Serial_MainWindow(object):
 "            line-height: 1.4;  /* 增加行高 */\n"
 "        }")
         self.send_tEdit.setObjectName("send_tEdit")
+        self.send_hex_tEdit = QtWidgets.QTextEdit(self.groupBox_5)
+        self.send_hex_tEdit.setGeometry(QtCore.QRect(10, 190, 330, 145))
+        self.send_hex_tEdit.setStyleSheet("        QTextEdit {\n"
+"            background-color: #f8f9fa;\n"
+"            border: 1px solid #dee2e6;\n"
+"            border-radius: 4px;\n"
+"            font-family: \'Courier New\', monospace;  /* 等宽字体 */\n"
+"            line-height: 1.4;  /* 增加行高 */\n"
+"        }")
+        self.send_hex_tEdit.setObjectName("send_hex_tEdit")
         Serial_MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(Serial_MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1000, 23))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 1000, 27))
         self.menubar.setObjectName("menubar")
         Serial_MainWindow.setMenuBar(self.menubar)
         self.statusbar = QtWidgets.QStatusBar(Serial_MainWindow)

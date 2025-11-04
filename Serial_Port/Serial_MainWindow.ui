@@ -667,8 +667,27 @@
       <rect>
        <x>10</x>
        <y>40</y>
-       <width>331</width>
-       <height>300</height>
+       <width>330</width>
+       <height>145</height>
+      </rect>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">        QTextEdit {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;  /* 等宽字体 */
+            line-height: 1.4;  /* 增加行高 */
+        }</string>
+     </property>
+    </widget>
+    <widget class="QTextEdit" name="send_hex_tEdit">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>190</y>
+       <width>330</width>
+       <height>145</height>
       </rect>
      </property>
      <property name="styleSheet">
@@ -689,7 +708,7 @@
      <x>0</x>
      <y>0</y>
      <width>1000</width>
-     <height>23</height>
+     <height>27</height>
     </rect>
    </property>
   </widget>
