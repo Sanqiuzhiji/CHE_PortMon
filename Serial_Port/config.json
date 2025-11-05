@@ -84,10 +84,10 @@
     },
     "send": {
       "hex_send": false,
-      "send_sync": true
+      "send_sync": false
     },
     "receive": {
-      "hex_receive": false,
+      "hex_receive": true,
       "timestamp": false,
       "auto_clear_receive": false
     },

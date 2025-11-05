@@ -14,6 +14,7 @@
 
 ```
 pip install PyQt5==5.15.11
+pip install matplotlib==3.10.7
 ```
 
 #### 目前安装的软件包有:

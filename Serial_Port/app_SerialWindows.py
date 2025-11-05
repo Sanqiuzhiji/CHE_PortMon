@@ -11,6 +11,7 @@ from PyQt5.QtSerialPort import QSerialPort, QSerialPortInfo
 from Serial_Port.Serial_MainWindow import Ui_Serial_MainWindow
 from Serial_Port.config_manager import JSONConfigManager
 from Serial_Port.app_SerialProcess import SerialProcess
+from Serial_Port.app_MathProcess import MathFunctionSender
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -36,6 +37,9 @@ class SerialAppClass(QMainWindow):
 
         # 初始化串口处理类
         self.serial_process = SerialProcess()
+
+        # 初始化数学函数发送器
+        self.math_sender = MathFunctionSender(self)
 
         # 初始化界面
         self.init_serial_ui()
@@ -195,6 +199,9 @@ class SerialAppClass(QMainWindow):
         # 其他-添加自动保存
         self.ui.send_sync_rbtn.toggled.connect(self.auto_save_settings)
 
+        # 数学函数信号
+        self.math_sender.connect_math_signals()
+
     def auto_save_settings(self):
         """自动保存设置"""
         self.save_current_settings()
@@ -309,11 +316,11 @@ class SerialAppClass(QMainWindow):
             QMessageBox.warning(self, "提示", "请先打开串口")
             return
 
-        if not self.ui.hex_send_chb.isChecked and not self.actual_text:
+        if not self.ui.hex_send_chb.isChecked() and not self.actual_text:
             QMessageBox.information(self, "提示", "请输入要发送的字符串数据")
             return
 
-        if self.ui.hex_send_chb.isChecked and not self.actual_hex_text:
+        if self.ui.hex_send_chb.isChecked() and not self.actual_hex_text:
             QMessageBox.information(self, "提示", "请输入要发送的十六进制数据")
             return
 
@@ -564,6 +571,9 @@ class SerialAppClass(QMainWindow):
         # 加载同步模式设置
         self.ui.send_sync_rbtn.setChecked(send_settings.get("send_sync", False))
 
+        # 尝试自动打开
+        self.toggle_serial_port()
+
     def set_comboBox_currentData(self, combo_box, data_value):
         """根据数据值设置组合框选中项"""
         index = combo_box.findData(data_value)
@@ -739,6 +749,7 @@ class SerialAppClass(QMainWindow):
         QTextEdit.focusInEvent(self.ui.send_tEdit, event)
         # 从格式化显示恢复为实际文本
         self.restore_actual_text()
+        self.ui.hex_send_chb.setChecked(False)
 
     def send_text_edit_focus_out(self, event):
         """发送文本框失去焦点 - 显示[\n]标记"""
@@ -746,13 +757,15 @@ class SerialAppClass(QMainWindow):
         QTextEdit.focusOutEvent(self.ui.send_tEdit, event)
         # 格式化为显示模式
         self.format_to_display_mode()
-        self.ui.hex_send_chb.setChecked(False)
 
     def send_hex_text_edit_focus_in(self, event):
-        pass
+        # 先调用父类方法，确保焦点事件被正确处理
+        QTextEdit.focusInEvent(self.ui.send_hex_tEdit, event)
+        self.ui.hex_send_chb.setChecked(True)
 
     def send_hex_text_edit_focus_out(self, event):
-        self.ui.hex_send_chb.setChecked(True)
+        # 先调用父类方法，确保焦点事件被正确处理
+        QTextEdit.focusOutEvent(self.ui.send_hex_tEdit, event)
 
     def restore_actual_text(self):
         """恢复实际文本显示（编辑模式）"""
@@ -822,8 +835,41 @@ class SerialAppClass(QMainWindow):
 
     def on_hex_edit_changed(self):
         """十六进制文本框内容变化"""
-        self.actual_hex_text = self.ui.send_hex_tEdit.toPlainText()
-        pass
+        # 阻塞信号防止递归
+        self.ui.send_hex_tEdit.blockSignals(True)
+
+        current_text = self.ui.send_hex_tEdit.toPlainText()
+        cursor = self.ui.send_hex_tEdit.textCursor()
+        original_position = cursor.position()
+
+        # 移除空格计算长度
+        hex_without_spaces = current_text.replace(' ', '')
+
+        # 计算原始文本中光标前的有效字符数
+        text_before_cursor = current_text[:original_position]
+        hex_chars_before_cursor = text_before_cursor.replace(' ', '')
+        hex_chars_count_before = len(hex_chars_before_cursor)
+
+        # 格式化文本
+        formatted_text = ' '.join([hex_without_spaces[i:i + 2] for i in range(0, len(hex_without_spaces), 2)])
+
+        # 更新文本框
+        self.ui.send_hex_tEdit.setPlainText(formatted_text)
+
+        # 更新实际文本（不带空格）
+        self.actual_hex_text = hex_without_spaces
+
+        # 计算新光标位置
+        if formatted_text:
+            # 计算新位置：每2个字符后有一个空格
+            new_position = hex_chars_count_before + (hex_chars_count_before // 2)
+            new_position = min(new_position, len(formatted_text))
+
+            cursor.setPosition(new_position)
+            self.ui.send_hex_tEdit.setTextCursor(cursor)
+
+        # 恢复信号
+        self.ui.send_hex_tEdit.blockSignals(False)
 
     def sync_text_to_hex(self, text_to_convert):
         """从字符串同步到十六进制"""
