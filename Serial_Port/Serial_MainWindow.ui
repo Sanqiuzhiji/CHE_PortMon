@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1129</width>
+    <width>942</width>
     <height>810</height>
    </rect>
   </property>
@@ -701,7 +701,7 @@
      </property>
      <layout class="QHBoxLayout" name="horizontalLayout_10">
       <item>
-       <widget class="QPushButton" name="clear_Send_btn">
+       <widget class="QPushButton" name="clear_send_btn">
         <property name="font">
          <font>
           <family>楷体</family>
@@ -727,7 +727,7 @@
        </widget>
       </item>
       <item>
-       <widget class="QPushButton" name="clear_Send_hex_btn">
+       <widget class="QPushButton" name="clear_send_hex_btn">
         <property name="font">
          <font>
           <family>楷体</family>
@@ -748,7 +748,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1129</width>
+     <width>942</width>
      <height>23</height>
     </rect>
    </property>

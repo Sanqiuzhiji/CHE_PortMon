@@ -67,6 +67,7 @@ class SerialAppClass(QMainWindow):
 
         # 发送区实际文本
         self.actual_text = ""
+        self.actual_hex_text = ""
 
         # 同步状态标志
         self.is_syncing = False
@@ -131,6 +132,8 @@ class SerialAppClass(QMainWindow):
         # 添加焦点事件监听
         self.ui.send_tEdit.focusInEvent = self.send_text_edit_focus_in
         self.ui.send_tEdit.focusOutEvent = self.send_text_edit_focus_out
+        self.ui.send_hex_tEdit.focusInEvent = self.send_hex_text_edit_focus_in
+        self.ui.send_hex_tEdit.focusOutEvent = self.send_hex_text_edit_focus_out
 
         # 端口信息文本框
         self.ui.port_info_lEdit.setReadOnly(True)
@@ -160,7 +163,8 @@ class SerialAppClass(QMainWindow):
         self.ui.save_receive_btn.clicked.connect(self.save_receive_data)
         self.ui.path_receive_btn.clicked.connect(self.select_receive_path)
         self.ui.self_Send_btn.clicked.connect(self.send_data)
-        self.ui.clear_Send_btn.clicked.connect(self.clear_send_data)
+        self.ui.clear_send_btn.clicked.connect(self.clear_send_data)
+        self.ui.clear_send_hex_btn.clicked.connect(self.clear_send_hex_data)
         self.ui.path_send_btn.clicked.connect(self.select_send_file)
         self.ui.sendFile_btn.clicked.connect(self.send_file)
         self.ui.auto_clearReceive_chb.stateChanged.connect(self.on_auto_clear_changed)
@@ -333,6 +337,11 @@ class SerialAppClass(QMainWindow):
             self.on_auto_send_changed()
         self.actual_text = ""
         self.ui.send_tEdit.clear()
+
+    def clear_send_hex_data(self):
+        """清空发送十六进制数据"""
+        self.ui.send_hex_tEdit.clear()
+        self.actual_hex_text = ""
 
     def toggle_pause_receive(self):
         """暂停/恢复接收"""
@@ -729,6 +738,12 @@ class SerialAppClass(QMainWindow):
         # 格式化为显示模式
         self.format_to_display_mode()
 
+    def send_hex_text_edit_focus_in(self, event):
+        pass
+
+    def send_hex_text_edit_focus_out(self, event):
+        pass
+
     def restore_actual_text(self):
         """恢复实际文本显示（编辑模式）"""
         # 还原实际文本
@@ -776,7 +791,9 @@ class SerialAppClass(QMainWindow):
         """同步模式切换"""
         if checked:
             self.sync_text_to_hex(self.actual_text)
+            self.ui.send_hex_tEdit.setEnabled(False)
         else:
+            self.ui.send_hex_tEdit.setEnabled(True)
             self.ui.send_hex_tEdit.clear()
 
     def on_text_edit_changed(self):
@@ -803,8 +820,8 @@ class SerialAppClass(QMainWindow):
             if text_to_convert:
                 hex_text = text_to_convert.encode('utf-8').hex()
                 # 格式化为每两个字符一组，用空格分隔
-                formatted_hex = ' '.join([hex_text[i:i + 2] for i in range(0, len(hex_text), 2)])
-                self.ui.send_hex_tEdit.setPlainText(formatted_hex)
+                actual_hex_text = ' '.join([hex_text[i:i + 2] for i in range(0, len(hex_text), 2)])
+                self.ui.send_hex_tEdit.setPlainText(actual_hex_text)
             else:
                 self.ui.send_hex_tEdit.clear()
 
