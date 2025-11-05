@@ -84,7 +84,7 @@ class SerialProcess(QObject):
         except Exception as e:
             self.error_occurred.emit(f"读取数据错误: {str(e)}")
 
-    def send_data(self, data, is_hex=False):
+    def send_data(self, data, data_hex, is_hex=False):
         """发送数据"""
         if not self.serial.isOpen():
             self.error_occurred.emit("串口未打开")
@@ -93,12 +93,14 @@ class SerialProcess(QObject):
         try:
             if is_hex:
                 # 十六进制发送
-                data = data.replace(' ', '').replace('\n', '').replace('\r', '')
-                if len(data) % 2 != 0:
-                    self.error_occurred.emit("十六进制数据长度必须为偶数")
-                    return False
+                data_hex = data_hex.replace(' ', '').replace('\n', '').replace('\r', '')
+                # print(f"十六进制数据: {data_hex}, 长度: {len(data_hex)}")
 
-                byte_data = bytes.fromhex(data)
+                if len(data_hex) % 2 != 0:
+                    # 自动在前面补0，使其长度为偶数
+                    data_hex = '0' + data_hex
+
+                byte_data = bytes.fromhex(data_hex)
             else:
                 # 文本发送
                 byte_data = data.encode('utf-8')

@@ -162,7 +162,7 @@ class SerialAppClass(QMainWindow):
         self.ui.pause_receive_btn.clicked.connect(self.toggle_pause_receive)
         self.ui.save_receive_btn.clicked.connect(self.save_receive_data)
         self.ui.path_receive_btn.clicked.connect(self.select_receive_path)
-        self.ui.self_Send_btn.clicked.connect(self.send_data)
+        self.ui.self_send_btn.clicked.connect(self.send_data)
         self.ui.clear_send_btn.clicked.connect(self.clear_send_data)
         self.ui.clear_send_hex_btn.clicked.connect(self.clear_send_hex_data)
         self.ui.path_send_btn.clicked.connect(self.select_send_file)
@@ -191,6 +191,9 @@ class SerialAppClass(QMainWindow):
         self.ui.parity_cb.currentTextChanged.connect(self.auto_save_settings)
         self.ui.databits_cb.currentTextChanged.connect(self.auto_save_settings)
         self.ui.stopbits_cb.currentTextChanged.connect(self.auto_save_settings)
+
+        # 其他-添加自动保存
+        self.ui.send_sync_rbtn.toggled.connect(self.auto_save_settings)
 
     def auto_save_settings(self):
         """自动保存设置"""
@@ -306,12 +309,15 @@ class SerialAppClass(QMainWindow):
             QMessageBox.warning(self, "提示", "请先打开串口")
             return
 
-        if not self.actual_text:
-            QMessageBox.information(self, "提示", "请输入要发送的数据")
+        if not self.ui.hex_send_chb.isChecked and not self.actual_text:
+            QMessageBox.information(self, "提示", "请输入要发送的字符串数据")
             return
 
-        is_hex = self.ui.hex_send_chb.isChecked()
-        if self.serial_process.send_data(self.actual_text, is_hex):
+        if self.ui.hex_send_chb.isChecked and not self.actual_hex_text:
+            QMessageBox.information(self, "提示", "请输入要发送的十六进制数据")
+            return
+
+        if self.serial_process.send_data(self.actual_text, self.actual_hex_text, self.ui.hex_send_chb.isChecked()):
             # 发送成功
             pass
 
@@ -555,6 +561,9 @@ class SerialAppClass(QMainWindow):
         self.ui.file_receive_lEdit.setText(file_paths.get("receive_save", ""))
         self.ui.file_send_lEdit.setText(file_paths.get("send_file", ""))
 
+        # 加载同步模式设置
+        self.ui.send_sync_rbtn.setChecked(send_settings.get("send_sync", False))
+
     def set_comboBox_currentData(self, combo_box, data_value):
         """根据数据值设置组合框选中项"""
         index = combo_box.findData(data_value)
@@ -737,12 +746,13 @@ class SerialAppClass(QMainWindow):
         QTextEdit.focusOutEvent(self.ui.send_tEdit, event)
         # 格式化为显示模式
         self.format_to_display_mode()
+        self.ui.hex_send_chb.setChecked(False)
 
     def send_hex_text_edit_focus_in(self, event):
         pass
 
     def send_hex_text_edit_focus_out(self, event):
-        pass
+        self.ui.hex_send_chb.setChecked(True)
 
     def restore_actual_text(self):
         """恢复实际文本显示（编辑模式）"""
@@ -792,6 +802,7 @@ class SerialAppClass(QMainWindow):
         if checked:
             self.sync_text_to_hex(self.actual_text)
             self.ui.send_hex_tEdit.setEnabled(False)
+            self.ui.hex_send_chb.setChecked(False)
         else:
             self.ui.send_hex_tEdit.setEnabled(True)
             self.ui.send_hex_tEdit.clear()
@@ -811,6 +822,7 @@ class SerialAppClass(QMainWindow):
 
     def on_hex_edit_changed(self):
         """十六进制文本框内容变化"""
+        self.actual_hex_text = self.ui.send_hex_tEdit.toPlainText()
         pass
 
     def sync_text_to_hex(self, text_to_convert):
@@ -820,8 +832,8 @@ class SerialAppClass(QMainWindow):
             if text_to_convert:
                 hex_text = text_to_convert.encode('utf-8').hex()
                 # 格式化为每两个字符一组，用空格分隔
-                actual_hex_text = ' '.join([hex_text[i:i + 2] for i in range(0, len(hex_text), 2)])
-                self.ui.send_hex_tEdit.setPlainText(actual_hex_text)
+                self.actual_hex_text = ' '.join([hex_text[i:i + 2] for i in range(0, len(hex_text), 2)])
+                self.ui.send_hex_tEdit.setPlainText(self.actual_hex_text)
             else:
                 self.ui.send_hex_tEdit.clear()
 

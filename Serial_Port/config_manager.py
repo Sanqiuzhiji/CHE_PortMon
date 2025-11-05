@@ -133,6 +133,7 @@ class JSONConfigManager:
             },
             "send": {
                 "hex_send": serial_app.ui.hex_send_chb.isChecked(),
+                "send_sync": serial_app.ui.send_sync_rbtn.isChecked(),
             },
             "receive": {
                 "hex_receive": serial_app.ui.hex_receive_chb.isChecked(),
