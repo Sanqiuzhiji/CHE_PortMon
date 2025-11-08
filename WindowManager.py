@@ -25,7 +25,7 @@ class WindowManagerClass:
         self.stacked_widget.setCurrentWidget(self.serial_port_window)
         # 使用窗口的实际尺寸设置堆栈大小
         width, height = self.serial_port_window.design_size
-        self.stacked_widget.setFixedSize(width, height)
+        self.stacked_widget.resize(width, height)
         self.stacked_widget.move(240 * 4 - 50, 135)
         self.stacked_widget.show()
 

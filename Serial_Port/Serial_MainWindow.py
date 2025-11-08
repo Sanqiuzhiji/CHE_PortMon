@@ -15,7 +15,7 @@ class Ui_Serial_MainWindow(object):
     def setupUi(self, Serial_MainWindow):
         Serial_MainWindow.setObjectName("Serial_MainWindow")
         Serial_MainWindow.resize(1128, 810)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(Serial_MainWindow.sizePolicy().hasHeightForWidth())
