@@ -75,6 +75,10 @@ class MathFunctionSender:
         self.canvas = FigureCanvas(self.figure)
         self.ax = self.figure.add_subplot(111)
 
+        # 设置中文字体支持
+        plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans']  # 支持中文的字体
+        plt.rcParams['axes.unicode_minus'] = False  # 正确显示负号
+
         # 设置图表样式
         self.ax.grid(True, alpha=0.3)
         self.ax.set_xlabel('X')
@@ -120,6 +124,10 @@ class MathFunctionSender:
             self.ax.grid(True, alpha=0.3)
             self.ax.set_xlabel('X')
             self.ax.set_ylabel('Y')
+
+            # 设置支持中文的标题
+            plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans']
+            plt.rcParams['axes.unicode_minus'] = False
             self.ax.set_title(f'{self.ui.function_type_cb.currentText()} 图形')
 
             # 自动调整坐标轴范围
