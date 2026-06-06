@@ -87,8 +87,8 @@
       "send_sync": false
     },
     "receive": {
-      "hex_receive": true,
-      "timestamp": false,
+      "hex_receive": false,
+      "timestamp": true,
       "auto_clear_receive": false
     },
     "flow_control": {
