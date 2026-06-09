@@ -1,0 +1,6 @@
+{
+  "theme": "深色",
+  "default_baudrate": "115200",
+  "auto_connect": false,
+  "default_save_path": "G:/Desk/Common_Folders/CHE_PortMon"
+}

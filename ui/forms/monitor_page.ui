@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MonitorPage</class>
+ <widget class="QWidget" name="MonitorPage">
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="leftMargin"><number>24</number></property><property name="topMargin"><number>24</number></property><property name="rightMargin"><number>24</number></property><property name="bottomMargin"><number>24</number></property>
+   <item><layout class="QHBoxLayout" name="toolbarLayout">
+    <item><widget class="QCheckBox" name="hexCheckBox"><property name="text"><string>十六进制显示</string></property></widget></item>
+    <item><widget class="QCheckBox" name="timestampCheckBox"><property name="text"><string>时间戳</string></property></widget></item>
+    <item><widget class="QCheckBox" name="autoScrollCheckBox"><property name="text"><string>自动滚动</string></property><property name="checked"><bool>true</bool></property></widget></item>
+    <item><widget class="QCheckBox" name="pauseCheckBox"><property name="text"><string>暂停接收</string></property></widget></item>
+    <item><spacer name="toolbarSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint"><size><width>40</width><height>20</height></size></property></spacer></item>
+    <item><widget class="QPushButton" name="clearButton"><property name="text"><string>清空接收</string></property></widget></item>
+    <item><widget class="QPushButton" name="saveButton"><property name="text"><string>保存接收数据</string></property></widget></item>
+   </layout></item>
+   <item><widget class="QTextEdit" name="receiveTextEdit"><property name="readOnly"><bool>true</bool></property></widget></item>
+  </layout>
+ </widget>
+ <resources/><connections/>
+</ui>

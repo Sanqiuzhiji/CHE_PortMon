@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ConnectionPage</class>
+ <widget class="QWidget" name="ConnectionPage">
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="leftMargin"><number>24</number></property><property name="topMargin"><number>24</number></property><property name="rightMargin"><number>24</number></property><property name="bottomMargin"><number>24</number></property>
+   <item>
+    <widget class="QGroupBox" name="connectionGroup"><property name="title"><string>连接配置</string></property>
+     <layout class="QFormLayout" name="formLayout">
+      <item row="0" column="0"><widget class="QLabel" name="portLabel"><property name="text"><string>串口号</string></property></widget></item>
+      <item row="0" column="1"><layout class="QHBoxLayout" name="portLayout"><item><widget class="QComboBox" name="portComboBox"/></item><item><widget class="QPushButton" name="refreshButton"><property name="text"><string>刷新串口</string></property></widget></item></layout></item>
+      <item row="1" column="0"><widget class="QLabel" name="baudLabel"><property name="text"><string>波特率</string></property></widget></item>
+      <item row="1" column="1"><widget class="QComboBox" name="baudComboBox"><property name="editable"><bool>true</bool></property></widget></item>
+      <item row="2" column="0"><widget class="QLabel" name="parityLabel"><property name="text"><string>校验位</string></property></widget></item>
+      <item row="2" column="1"><widget class="QComboBox" name="parityComboBox"/></item>
+      <item row="3" column="0"><widget class="QLabel" name="dataBitsLabel"><property name="text"><string>数据位</string></property></widget></item>
+      <item row="3" column="1"><widget class="QComboBox" name="dataBitsComboBox"/></item>
+      <item row="4" column="0"><widget class="QLabel" name="stopBitsLabel"><property name="text"><string>停止位</string></property></widget></item>
+      <item row="4" column="1"><widget class="QComboBox" name="stopBitsComboBox"/></item>
+      <item row="5" column="0"><widget class="QLabel" name="lineLabel"><property name="text"><string>控制线</string></property></widget></item>
+      <item row="5" column="1"><layout class="QHBoxLayout" name="lineLayout"><item><widget class="QCheckBox" name="rtsCheckBox"><property name="text"><string>RTS</string></property></widget></item><item><widget class="QCheckBox" name="dtrCheckBox"><property name="text"><string>DTR</string></property></widget></item><item><spacer name="lineSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint"><size><width>40</width><height>20</height></size></property></spacer></item></layout></item>
+      <item row="6" column="1"><widget class="QPushButton" name="toggleButton"><property name="text"><string>打开串口</string></property></widget></item>
+     </layout>
+    </widget>
+   </item>
+   <item><widget class="QGroupBox" name="infoGroup"><property name="title"><string>串口描述信息</string></property><layout class="QVBoxLayout" name="infoLayout"><item><widget class="QTextEdit" name="infoTextEdit"><property name="readOnly"><bool>true</bool></property></widget></item></layout></widget></item>
+  </layout>
+ </widget>
+ <resources/><connections/>
+</ui>

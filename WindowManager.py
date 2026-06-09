@@ -3,7 +3,7 @@ import sys
 
 from PyQt5.QtWidgets import QApplication
 
-from MainWindow import MainWindow
+from app.main_window import MainWindow
 
 
 class WindowManagerClass:
@@ -11,7 +11,7 @@ class WindowManagerClass:
         self.app = QApplication(sys.argv)
         self.app.setStyle("Fusion")
 
-        self.main_window = MainWindow(self)
+        self.main_window = MainWindow()
         self.main_window.move(190, 135)
         self.main_window.show()
 
