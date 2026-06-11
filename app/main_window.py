@@ -1,19 +1,17 @@
 # -*- coding: utf-8 -*-
-from pathlib import Path
-
 from PyQt5.QtCore import QTimer
-from PyQt5.QtWidgets import QFileDialog, QMainWindow, QMessageBox
+from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox
 
 from services.config_service import ConfigService
+from services.port_scan_thread import PortScanThread
 from services.serial_service import SerialService
+from services.theme_service import ThemeService
 from ui.generated.main_window_ui import Ui_MainWindow
-from ui.pages.connection_page import ConnectionPage
 from ui.pages.function_page import FunctionPage
-from ui.pages.monitor_page import MonitorPage
-from ui.pages.send_page import SendPage
+from ui.pages.serial_page import SerialPage
 from ui.pages.settings_page import SettingsPage
-from utils.file_utils import read_binary_file, save_text_file
-from utils.format_utils import format_received_data, hex_to_bytes, text_to_bytes
+from utils.file_utils import save_text_file
+from utils.format_utils import text_to_bytes
 from utils.function_generator import generate_function_points
 
 
@@ -27,49 +25,39 @@ class MainWindow(QMainWindow):
 
         self.serial_service = SerialService()
         self.config_service = ConfigService()
+        self.theme_service = ThemeService()
         self.settings = self.config_service.load_settings()
         self.current_port = "-"
         self.current_baud = "-"
         self.connected = False
         self.function_points = []
         self.function_index = 0
+        self.port_scan_thread = None
 
-        self.auto_send_timer = QTimer(self)
-        self.auto_send_timer.timeout.connect(self._send_current_payload)
         self.function_send_timer = QTimer(self)
         self.function_send_timer.timeout.connect(self._send_next_function_point)
 
         self._create_pages()
         self._connect_signals()
-        self._apply_styles()
+        self._apply_theme()
         self._apply_settings()
         self._refresh_ports()
         self._select_page(0)
         self._update_status()
 
     def _create_pages(self):
-        self.connection_page = ConnectionPage()
-        self.monitor_page = MonitorPage()
-        self.send_page = SendPage()
+        self.serial_page = SerialPage()
         self.function_page = FunctionPage()
         self.settings_page = SettingsPage()
 
-        for page in (
-            self.connection_page,
-            self.monitor_page,
-            self.send_page,
-            self.function_page,
-            self.settings_page,
-        ):
+        for page in (self.serial_page, self.function_page, self.settings_page):
             self.ui.pageStack.addWidget(page)
 
     def _connect_signals(self):
         nav_pairs = [
-            (self.ui.connectionNavButton, 0),
-            (self.ui.monitorNavButton, 1),
-            (self.ui.sendNavButton, 2),
-            (self.ui.functionNavButton, 3),
-            (self.ui.settingsNavButton, 4),
+            (self.ui.serialNavButton, 0),
+            (self.ui.functionNavButton, 1),
+            (self.ui.settingsNavButton, 2),
         ]
         self.nav_buttons = [button for button, _ in nav_pairs]
         for button, index in nav_pairs:
@@ -81,15 +69,12 @@ class MainWindow(QMainWindow):
         self.serial_service.error.connect(self._show_error)
         self.serial_service.stats_changed.connect(self._update_counts)
 
-        self.connection_page.refresh_requested.connect(self._refresh_ports)
-        self.connection_page.toggle_connection_requested.connect(self._toggle_connection)
-
-        self.monitor_page.clear_requested.connect(self._clear_receive)
-        self.monitor_page.save_requested.connect(self._save_receive_data)
-
-        self.send_page.send_requested.connect(self._send_current_payload)
-        self.send_page.auto_send_toggled.connect(self._set_auto_send)
-        self.send_page.file_send_requested.connect(self._send_selected_file)
+        self.serial_page.refresh_ports_requested.connect(self._refresh_ports)
+        self.serial_page.open_port_requested.connect(self._open_port)
+        self.serial_page.close_port_requested.connect(self._close_port)
+        self.serial_page.send_data_requested.connect(self._send_payload)
+        self.serial_page.clear_receive_requested.connect(self._clear_receive)
+        self.serial_page.save_receive_requested.connect(self._save_receive_data)
 
         self.function_page.preview_requested.connect(self._preview_function)
         self.function_page.send_requested.connect(self._start_function_send)
@@ -97,26 +82,27 @@ class MainWindow(QMainWindow):
 
         self.settings_page.save_requested.connect(self._save_settings)
 
-    def _apply_styles(self):
-        if self.settings.theme == "浅色":
-            self.setStyleSheet("")
-            return
-        style_path = Path(__file__).resolve().parents[1] / "ui" / "styles" / "dark.qss"
-        self.setStyleSheet(style_path.read_text(encoding="utf-8") if style_path.exists() else "")
+    def _apply_theme(self):
+        app = QApplication.instance()
+        if app is not None:
+            self.settings.theme = self.theme_service.apply_theme(app, self.settings.theme)
+        else:
+            self.settings.theme = self.theme_service.apply_theme(self, self.settings.theme)
 
     def _apply_settings(self):
-        self.connection_page.set_default_baudrate(self.settings.default_baudrate)
-        self.monitor_page.set_default_save_path(self.settings.default_save_path)
+        self.serial_page.set_default_baudrate(self.settings.default_baudrate)
+        self.serial_page.set_default_save_path(self.settings.default_save_path)
         self.settings_page.set_settings(self.settings)
         if self.settings.auto_connect:
-            QTimer.singleShot(100, self._toggle_connection)
+            QTimer.singleShot(100, lambda: self._open_port(self.serial_page.serial_config()))
 
     def _save_settings(self, settings):
         self.settings = settings
-        self.config_service.save_settings(settings)
-        self.connection_page.set_default_baudrate(settings.default_baudrate)
-        self.monitor_page.set_default_save_path(settings.default_save_path)
-        self._apply_styles()
+        self._apply_theme()
+        self.config_service.save_settings(self.settings)
+        self.serial_page.set_default_baudrate(self.settings.default_baudrate)
+        self.serial_page.set_default_save_path(self.settings.default_save_path)
+        self.settings_page.set_settings(self.settings)
         QMessageBox.information(self, "设置", "设置已保存")
 
     def _select_page(self, index):
@@ -127,82 +113,55 @@ class MainWindow(QMainWindow):
             button.style().polish(button)
 
     def _refresh_ports(self):
-        self.connection_page.set_ports(self.serial_service.list_ports())
+        if self.port_scan_thread is not None and self.port_scan_thread.isRunning():
+            return
+        self.serial_page.set_refreshing(True)
+        self.port_scan_thread = PortScanThread(self)
+        self.port_scan_thread.ports_ready.connect(self._handle_ports_refreshed)
+        self.port_scan_thread.scan_failed.connect(self._show_error)
+        self.port_scan_thread.finished.connect(self._finish_port_refresh)
+        self.port_scan_thread.start()
 
-    def _toggle_connection(self):
-        if self.serial_service.is_open():
-            self.serial_service.close_port()
-            return
-        try:
-            config = self.connection_page.get_config()
-        except ValueError as exc:
-            self._show_error(f"串口配置无效: {exc}")
-            return
+    def _handle_ports_refreshed(self, ports):
+        self.serial_page.set_ports(ports)
+
+    def _finish_port_refresh(self):
+        self.serial_page.set_refreshing(False)
+        if self.port_scan_thread is not None:
+            self.port_scan_thread.deleteLater()
+            self.port_scan_thread = None
+
+    def _open_port(self, config):
         self.current_port = config.port_name or "-"
         self.current_baud = str(config.baud_rate)
         self.serial_service.open_port(config)
 
+    def _close_port(self):
+        self.serial_service.close_port()
+
     def _handle_opened(self):
         self.connected = True
-        self.connection_page.set_connected(True)
+        self.serial_page.set_connected(True)
         self._update_status()
 
     def _handle_closed(self):
         self.connected = False
-        self.connection_page.set_connected(False)
-        self._set_auto_send(False)
+        self.serial_page.set_connected(False)
         self._stop_function_send()
         self._update_status()
 
     def _handle_received_data(self, data):
-        options = self.monitor_page.get_options()
-        if options.paused:
-            return
-        self.monitor_page.append_receive_data(
-            format_received_data(data, hex_display=options.hex_display, timestamp=options.timestamp)
-        )
+        self.serial_page.append_received_data(data)
 
-    def _send_current_payload(self):
-        try:
-            payload = self._build_send_payload()
-        except ValueError as exc:
-            self._show_error(str(exc))
-            self._set_auto_send(False)
-            return
+    def _send_payload(self, payload):
         self.serial_service.send_bytes(payload)
 
-    def _build_send_payload(self):
-        options = self.send_page.get_options()
-        text = self.send_page.send_text()
-        if options.hex_mode:
-            return hex_to_bytes(text)
-        return text_to_bytes(text, append_newline=options.append_newline)
-
-    def _set_auto_send(self, enabled):
-        if enabled:
-            self.auto_send_timer.start(self.send_page.auto_interval_ms())
-        else:
-            self.auto_send_timer.stop()
-        self.send_page.set_auto_sending(enabled)
-
-    def _send_selected_file(self):
-        path = self.send_page.selected_file_path()
-        if not path:
-            path, _ = QFileDialog.getOpenFileName(self, "选择要发送的文件", "", "所有文件 (*)")
-            if not path:
-                return
-        try:
-            self.serial_service.send_bytes(read_binary_file(path))
-        except OSError as exc:
-            self._show_error(f"读取文件失败: {exc}")
-
     def _clear_receive(self):
-        self.monitor_page.clear_receive_data()
         self.serial_service.reset_receive_count()
 
     def _save_receive_data(self, path):
         try:
-            save_text_file(path, self.monitor_page.receive_text())
+            save_text_file(path, self.serial_page.receive_text())
         except OSError as exc:
             self._show_error(f"保存接收数据失败: {exc}")
 
@@ -223,6 +182,9 @@ class MainWindow(QMainWindow):
             self._show_error(str(exc))
 
     def _start_function_send(self):
+        if not self.serial_service.is_open():
+            self._show_error("请先打开串口")
+            return
         if not self.function_points:
             self._preview_function()
         if not self.function_points:

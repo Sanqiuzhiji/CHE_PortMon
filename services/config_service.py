@@ -11,11 +11,17 @@ class ConfigService:
 
     def load_settings(self):
         if not self.config_path.exists():
-            return AppSettings()
+            settings = AppSettings()
+            self.save_settings(settings)
+            return settings
         try:
-            return AppSettings.from_dict(json.loads(self.config_path.read_text(encoding="utf-8")))
+            settings = AppSettings.from_dict(json.loads(self.config_path.read_text(encoding="utf-8")))
+            self.save_settings(settings)
+            return settings
         except (OSError, json.JSONDecodeError):
-            return AppSettings()
+            settings = AppSettings()
+            self.save_settings(settings)
+            return settings
 
     def save_settings(self, settings):
         self.config_path.parent.mkdir(parents=True, exist_ok=True)

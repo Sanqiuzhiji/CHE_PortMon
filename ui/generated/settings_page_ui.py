@@ -64,7 +64,7 @@ class Ui_SettingsPage(object):
     def retranslateUi(self, SettingsPage):
         _translate = QtCore.QCoreApplication.translate
         self.settingsGroup.setTitle(_translate("SettingsPage", "应用设置"))
-        self.themeLabel.setText(_translate("SettingsPage", "主题"))
+        self.themeLabel.setText(_translate("SettingsPage", "主题模式"))
         self.baudLabel.setText(_translate("SettingsPage", "默认波特率"))
         self.defaultBaudLineEdit.setText(_translate("SettingsPage", "115200"))
         self.autoConnectLabel.setText(_translate("SettingsPage", "启动自动连接"))

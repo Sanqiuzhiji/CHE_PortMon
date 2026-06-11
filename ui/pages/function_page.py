@@ -1,11 +1,27 @@
 # -*- coding: utf-8 -*-
+from pathlib import Path
+
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import QVBoxLayout, QWidget
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.font_manager import FontProperties
 from matplotlib.figure import Figure
 
 from ui.generated.function_page_ui import Ui_FunctionPage
+
+
+def _cjk_font_properties():
+    for font_path in (
+        "C:/Windows/Fonts/msyh.ttc",
+        "C:/Windows/Fonts/msyh.ttf",
+        "C:/Windows/Fonts/simhei.ttf",
+        "C:/Windows/Fonts/simsun.ttc",
+    ):
+        path = Path(font_path)
+        if path.exists():
+            return FontProperties(fname=str(path))
+    return None
 
 
 class FunctionPage(QWidget):
@@ -18,12 +34,13 @@ class FunctionPage(QWidget):
         self.ui = Ui_FunctionPage()
         self.ui.setupUi(self)
         self._sending = False
+        self._title_font = _cjk_font_properties()
         self.ui.functionComboBox.addItems(["正弦", "余弦", "正切", "方波", "三角波", "锯齿波", "指数", "对数"])
         self.figure = Figure(figsize=(6, 4), dpi=90)
         self.canvas = FigureCanvas(self.figure)
         self.ax = self.figure.add_subplot(111)
         self.ax.grid(True, alpha=0.3)
-        self.ax.set_title("函数预览")
+        self._set_chart_title("函数预览", "Function Preview")
         chart_layout = QVBoxLayout(self.ui.chartContainer)
         chart_layout.setContentsMargins(0, 0, 0, 0)
         chart_layout.addWidget(self.canvas)
@@ -55,7 +72,7 @@ class FunctionPage(QWidget):
         self.ax.plot(x_values, y_values, color="#2f80ed", linewidth=2)
         self.ax.set_xlabel("X")
         self.ax.set_ylabel("Y")
-        self.ax.set_title(f"{self.ui.functionComboBox.currentText()} 预览")
+        self._set_chart_title(f"{self.ui.functionComboBox.currentText()} 预览", "Function Preview")
         self.canvas.draw()
 
     def set_sending(self, sending):
@@ -67,3 +84,9 @@ class FunctionPage(QWidget):
             self.stop_requested.emit()
         else:
             self.send_requested.emit()
+
+    def _set_chart_title(self, title, fallback_title):
+        if self._title_font is None:
+            self.ax.set_title(fallback_title)
+            return
+        self.ax.set_title(title, fontproperties=self._title_font)

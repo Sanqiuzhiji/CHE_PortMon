@@ -20,7 +20,7 @@ class SerialService(QObject):
         self.serial.errorOccurred.connect(self._handle_error)
 
     @staticmethod
-    def list_ports():
+    def list_ports(include_busy=False):
         ports = []
         for port in QSerialPortInfo.availablePorts():
             ports.append(
@@ -32,7 +32,7 @@ class SerialService(QObject):
                     "location": port.systemLocation(),
                     "vendor_id": f"0x{port.vendorIdentifier():04x}" if port.vendorIdentifier() else "",
                     "product_id": f"0x{port.productIdentifier():04x}" if port.productIdentifier() else "",
-                    "is_busy": port.isBusy(),
+                    "is_busy": port.isBusy() if include_busy else False,
                 }
             )
         return ports
