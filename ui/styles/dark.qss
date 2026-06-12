@@ -56,6 +56,21 @@ QStackedWidget {
     background: #202020;
 }
 
+QSplitter#ioSplitter::handle {
+    background: #303030;
+    border: 1px solid #444444;
+    border-radius: 2px;
+}
+
+QSplitter#ioSplitter::handle:vertical {
+    height: 6px;
+}
+
+QSplitter#ioSplitter::handle:hover {
+    background: #3d4e63;
+    border-color: #2d8cff;
+}
+
 QLabel {
     color: #dddddd;
 }
@@ -152,6 +167,144 @@ QPushButton#toggleButton[connected="true"] {
     background: #3b3b3b;
     border-color: #f56c6c;
     color: #ffb3b3;
+}
+
+QPushButton#hexToggleButton,
+QPushButton#timestampButton,
+QPushButton#autoScrollButton {
+    min-height: 24px;
+    padding: 3px 8px;
+}
+
+QPushButton#hexToggleButton {
+    font-weight: 600;
+}
+
+QPushButton#timestampButton,
+QPushButton#autoScrollButton {
+    padding: 3px;
+}
+
+QToolButton#sendToolButton {
+    background: #2d8cff;
+    border: 1px solid #409eff;
+    border-radius: 4px;
+    color: #ffffff;
+    font-weight: 600;
+    min-height: 24px;
+    padding: 4px 12px;
+}
+
+QToolButton#sendToolButton:hover {
+    background: #409eff;
+}
+
+QToolButton#sendToolButton::menu-button {
+    border-left: 1px solid #7bbdff;
+    width: 20px;
+}
+
+QMenu#sendSettingsMenu {
+    background: #ffffff;
+    border: 1px solid #d6e4f0;
+    border-radius: 6px;
+    color: #303133;
+    padding: 6px;
+}
+
+QMenu#sendSettingsMenu::item {
+    background: transparent;
+    color: #303133;
+    padding: 6px 28px 6px 24px;
+}
+
+QMenu#sendSettingsMenu::item:selected {
+    background: #eaf4ff;
+    color: #1677d2;
+}
+
+QMenu#sendSettingsMenu::separator {
+    background: #e6eaf0;
+    height: 1px;
+    margin: 6px 4px;
+}
+
+QWidget#sendMenuRow {
+    background: #ffffff;
+}
+
+QLabel#sendMenuLabel {
+    background: transparent;
+    color: #303133;
+    min-width: 105px;
+}
+
+QCheckBox#sendMenuCheckBox,
+QRadioButton#sendMenuRadioButton {
+    background: transparent;
+    color: #303133;
+    spacing: 8px;
+}
+
+QCheckBox#sendMenuCheckBox::indicator,
+QRadioButton#sendMenuRadioButton::indicator {
+    background: #ffffff;
+    border: 1px solid #9fb7cf;
+    height: 14px;
+    width: 14px;
+}
+
+QCheckBox#sendMenuCheckBox::indicator:checked,
+QRadioButton#sendMenuRadioButton::indicator:checked {
+    background: #1677d2;
+    border-color: #1677d2;
+}
+
+QPushButton#sendMenuStepButton {
+    background: #f3f8ff;
+    border: 1px solid #bddcff;
+    border-radius: 3px;
+    color: #1677d2;
+    font-weight: 700;
+    max-width: 22px;
+    min-height: 20px;
+    min-width: 22px;
+    padding: 0;
+}
+
+QSpinBox#sendMenuSpinBox {
+    background: #ffffff;
+    border: 1px solid #cfd8e3;
+    border-radius: 3px;
+    color: #303133;
+    min-height: 20px;
+    padding: 1px 4px;
+}
+
+QFrame#hexHintFrame {
+    background: #272b34;
+    border: 1px solid #ffb020;
+    border-radius: 8px;
+}
+
+QLabel#hexHintLabel {
+    background: transparent;
+    color: #fff2cc;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+QProgressBar#hexHintProgress {
+    background: #3a3a3a;
+    border: 0;
+    border-radius: 2px;
+    max-height: 4px;
+    min-height: 4px;
+}
+
+QProgressBar#hexHintProgress::chunk {
+    background: #ffb020;
+    border-radius: 2px;
 }
 
 QComboBox,
