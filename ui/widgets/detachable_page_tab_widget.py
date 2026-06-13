@@ -120,7 +120,35 @@ class DetachablePageTabWidget(QTabWidget):
         if widget is None:
             return
         self.removeTab(index)
+        self._page_keys.pop(widget, None)
+        self._page_titles.pop(widget, None)
         widget.deleteLater()
+
+    def remove_page_by_title(self, title):
+        removed = False
+        for index in range(self.count() - 1, -1, -1):
+            if self.tabText(index) == title:
+                self.remove_tab(index)
+                removed = True
+
+        for key, window in list(self._floating_windows.items()):
+            if window.windowTitle() != title:
+                continue
+            try:
+                window.closed.disconnect()
+            except TypeError:
+                pass
+            widget = window.takeCentralWidget()
+            if widget is not None:
+                self._page_keys.pop(widget, None)
+                self._page_titles.pop(widget, None)
+                widget.deleteLater()
+            self._floating_windows.pop(key, None)
+            window.close()
+            window.deleteLater()
+            removed = True
+
+        return removed
 
     def detach_tab(self, index, global_pos=None):
         widget = self.widget(index)

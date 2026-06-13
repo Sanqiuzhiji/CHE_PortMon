@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from PyQt5.QtCore import QTimer
+from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox
 
 from controllers.protocol_editor_controller import ProtocolEditorController
@@ -27,6 +28,7 @@ class MainWindow(QMainWindow):
         self.config_service = ConfigService()
         self.theme_service = ThemeService()
         self.settings = self.config_service.load_settings()
+        self.default_app_font = QApplication.font()
         self.current_port = "-"
         self.current_baud = "-"
         self.connected = False
@@ -39,6 +41,7 @@ class MainWindow(QMainWindow):
         self._create_pages()
         self._connect_signals()
         self._apply_theme()
+        self._apply_font()
         self._apply_settings()
         self.connection_page.refresh_ports()
         self._select_page(0)
@@ -86,6 +89,18 @@ class MainWindow(QMainWindow):
         else:
             self.settings.theme = self.theme_service.apply_theme(self, self.settings.theme)
 
+    def _apply_font(self):
+        app = QApplication.instance()
+        if app is None:
+            return
+        font_name = getattr(self.settings, "ui_font", "")
+        if font_name:
+            font = QFont(font_name)
+            font.setPointSize(self.default_app_font.pointSize())
+            app.setFont(font)
+        else:
+            app.setFont(self.default_app_font)
+
     def _apply_settings(self):
         self.connection_page.set_default_baudrate(self.settings.default_baudrate)
         self.connection_page.set_default_save_path(self.settings.default_save_path)
@@ -96,6 +111,7 @@ class MainWindow(QMainWindow):
     def _save_settings(self, settings):
         self.settings = settings
         self._apply_theme()
+        self._apply_font()
         self.config_service.save_settings(self.settings)
         self.connection_page.set_default_baudrate(self.settings.default_baudrate)
         self.connection_page.set_default_save_path(self.settings.default_save_path)

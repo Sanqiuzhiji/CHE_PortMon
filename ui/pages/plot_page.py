@@ -249,15 +249,20 @@ class PlotPage(QWidget):
         if not isinstance(layout, dict) or not isinstance(layout.get("pages"), list):
             QMessageBox.warning(self, "Import Plot Layout", "Invalid plot layout file.")
             return
-        self._load_layout_data(layout)
+        self._append_layout_data(layout)
 
     def _load_layout_data(self, layout):
         self.page_tabs.close_all_floating()
         while self.page_tabs.count():
             self.page_tabs.remove_tab(0)
+        self._append_layout_data(layout)
+
+    def _append_layout_data(self, layout):
         pages = layout.get("pages") or []
         for page_data in pages:
-            page = self.add_page(page_data.get("name", "Page"))
+            page_name = str(page_data.get("name", "Page")).strip() or "Page"
+            self.page_tabs.remove_page_by_title(page_name)
+            page = self.add_page(page_name)
             page.canvas.set_grid_size(int(page_data.get("grid_size", 20)))
             page.canvas.set_snap_to_grid(bool(page_data.get("snap_to_grid", True)))
             for control_data in page_data.get("controls", []):

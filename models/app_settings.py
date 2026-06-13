@@ -21,6 +21,7 @@ def normalize_theme(theme):
 @dataclass
 class AppSettings:
     theme: str = "dark"
+    ui_font: str = ""
     default_baudrate: str = "115200"
     auto_connect: bool = False
     default_save_path: str = ""
@@ -31,6 +32,7 @@ class AppSettings:
             return cls()
         return cls(
             theme=normalize_theme(data.get("theme", cls.theme)),
+            ui_font=str(data.get("ui_font", cls.ui_font)).strip(),
             default_baudrate=str(data.get("default_baudrate", cls.default_baudrate)),
             auto_connect=bool(data.get("auto_connect", cls.auto_connect)),
             default_save_path=data.get("default_save_path", cls.default_save_path),

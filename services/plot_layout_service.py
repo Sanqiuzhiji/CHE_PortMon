@@ -9,51 +9,6 @@ class PlotLayoutService:
     def __init__(self, path=None):
         self.pages_dir = Path("config/plot_pages")
 
-    def ensure_default_layout(self):
-        """
-        程序启动时使用：
-        1. 优先加载 config/plot_pages/*.json
-        2. 如果没有独立 Page 文件，再尝试加载旧版 config/plot_layout.json
-        3. 如果都没有，则创建默认 Page 1
-        """
-        layout = self.load_all_pages()
-        if layout.get("pages"):
-            return layout
-
-        if self.path.exists():
-            return self.load_layout()
-
-        layout = {
-            "pages": [
-                {
-                    "name": "Page 1",
-                    "grid_size": 20,
-                    "snap_to_grid": True,
-                    "controls": [],
-                }
-            ]
-        }
-        return layout
-
-    def load_layout(self):
-        """
-        旧版：读取整个工作区 config/plot_layout.json。
-        """
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        if not self.path.exists():
-            return {
-                "pages": [
-                    {
-                        "name": "Page 1",
-                        "grid_size": 20,
-                        "snap_to_grid": True,
-                        "controls": [],
-                    }
-                ]
-            }
-
-        return self.load_layout_from(self.path)
-
     def load_layout_from(self, path):
         path = Path(path)
         with path.open("r", encoding="utf-8") as handle:

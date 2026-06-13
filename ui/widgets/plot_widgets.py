@@ -3,7 +3,7 @@ import math
 import uuid
 from dataclasses import dataclass
 
-from PyQt5.QtCore import QPoint, QPointF, QSize, Qt, pyqtSignal
+from PyQt5.QtCore import QPoint, QPointF, QSize, Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QColor, QPainter, QPen, QBrush
 from PyQt5.QtWidgets import (
     QCheckBox,
@@ -220,7 +220,11 @@ class BasePlotControl(QFrame):
         if event.button() == Qt.LeftButton and self.childAt(event.pos()) is None:
             self._begin_drag(event)
         elif event.button() == Qt.RightButton:
+            if hasattr(self.parentWidget(), "select_control"):
+                self.parentWidget().select_control(self)
             self._show_context_menu(event.globalPos())
+            event.accept()
+            return
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
@@ -233,7 +237,10 @@ class BasePlotControl(QFrame):
         super().mouseReleaseEvent(event)
 
     def contextMenuEvent(self, event):
+        if hasattr(self.parentWidget(), "select_control"):
+            self.parentWidget().select_control(self)
         self._show_context_menu(event.globalPos())
+        event.accept()
 
     def _show_context_menu(self, global_pos):
         menu = QMenu(self)
@@ -274,10 +281,14 @@ class TogglePlotControl(BasePlotControl):
     def __init__(self, control_id=None, parent=None):
         super().__init__("Toggle", control_id=control_id, parent=parent)
         self.control_type = "toggle"
-        self._on_command = "ON"
-        self._off_command = "OFF"
+        self._command_name = "Toggle"
+        self._on_value = "1"
+        self._off_value = "0"
         self._line_ending = "LF"
         self._repeat_count = 1
+        self._checksum = "none"
+        self._joiner = ":"
+        self._ascii_mode = False
         self._is_on = False
 
         self.state_button = QPushButton("OFF", self.body)
@@ -299,29 +310,37 @@ class TogglePlotControl(BasePlotControl):
         self.command_generated.emit(self._build_command())
 
     def _build_command(self):
-        command = self._on_command if self._is_on else self._off_command
-        return _build_plot_command(command, self._line_ending, self._repeat_count)
+        value = self._on_value if self._is_on else self._off_value
+        command = f"{self._command_name}{self._joiner}{value}"
+        return _build_plot_command(command, self._line_ending, self._repeat_count, self._checksum)
 
     def _refresh_view(self):
         self.state_button.setText("ON" if self._is_on else "OFF")
-        self.preview_label.setText(self.title)
+        value = self._on_value if self._is_on else self._off_value
+        self.preview_label.setText(f"{self._command_name}{self._joiner}{value}")
+        self.header.setText(self._command_name)
 
     def control_config(self):
         return {
-            "title": self.title,
-            "on_command": self._on_command,
-            "off_command": self._off_command,
+            "command_name": self._command_name,
+            "on_value": self._on_value,
+            "off_value": self._off_value,
             "line_ending": self._line_ending,
             "repeat_count": self._repeat_count,
+            "checksum": self._checksum,
+            "joiner": self._joiner,
+            "ascii_mode": self._ascii_mode,
         }
 
     def apply_config(self, config):
-        self.title = config.get("title", self.title)
-        self._on_command = config.get("on_command", self._on_command)
-        self._off_command = config.get("off_command", self._off_command)
+        self._command_name = config.get("command_name", config.get("title", self._command_name))
+        self._on_value = config.get("on_value", config.get("on_command", self._on_value))
+        self._off_value = config.get("off_value", config.get("off_command", self._off_value))
         self._line_ending = config.get("line_ending", self._line_ending)
         self._repeat_count = int(config.get("repeat_count", self._repeat_count))
-        self.header.setText(self.title)
+        self._checksum = config.get("checksum", self._checksum)
+        self._joiner = config.get("joiner", self._joiner)
+        self._ascii_mode = bool(config.get("ascii_mode", self._ascii_mode))
         self._refresh_view()
 
 
@@ -361,7 +380,7 @@ class SliderPlotControl(BasePlotControl):
         self._refresh_view()
 
     def _apply_default_size(self):
-        self.resize(240, 130)
+        self.resize(240, 150)
 
     def _handle_slider_changed(self, value):
         ratio = value / 1000.0
@@ -440,8 +459,6 @@ class ModePlotControl(BasePlotControl):
         self._ascii_mode = False
         self._current_index = 0
 
-        self.label_row = QHBoxLayout()
-        self.body_layout.addLayout(self.label_row)
         self.buttons_row = QHBoxLayout()
         self.body_layout.addLayout(self.buttons_row)
         self._rebuild_buttons()
@@ -452,29 +469,36 @@ class ModePlotControl(BasePlotControl):
         self.resize(240, 130)
 
     def _rebuild_buttons(self):
-        while self.label_row.count():
-            item = self.label_row.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
         while self.buttons_row.count():
             item = self.buttons_row.takeAt(0)
             if item.widget():
                 item.widget().deleteLater()
-        for label in self._labels:
-            self.label_row.addWidget(QLabel(label, self.body))
-        self.label_row.addStretch(1)
         for index, label in enumerate(self._labels):
             button = QPushButton(label, self.body)
-            button.setCheckable(True)
-            button.setChecked(index == self._current_index)
             button.clicked.connect(lambda checked=False, idx=index: self._handle_mode_clicked(idx))
             self.buttons_row.addWidget(button)
         self.buttons_row.addStretch(1)
 
     def _handle_mode_clicked(self, index):
         self._current_index = index
+        button = self.sender()
+        if button is not None:
+            self._flash_button(button)
         self._refresh_view()
         self.command_generated.emit(self._build_command())
+
+    def _flash_button(self, button):
+        button.setProperty("active", True)
+        button.style().unpolish(button)
+        button.style().polish(button)
+        QTimer.singleShot(160, lambda: self._clear_button_flash(button))
+
+    def _clear_button_flash(self, button):
+        if button is None:
+            return
+        button.setProperty("active", False)
+        button.style().unpolish(button)
+        button.style().polish(button)
 
     def _build_command(self):
         value = self._values[self._current_index] if self._values else "0"
@@ -815,28 +839,40 @@ class _ToggleConfigDialog(_BaseConfigDialog):
     def __init__(self, control, parent=None):
         super().__init__(control, parent)
         config = control.control_config()
-        self.title_edit = QLineEdit(config["title"], self)
-        self.on_edit = QLineEdit(config["on_command"], self)
-        self.off_edit = QLineEdit(config["off_command"], self)
-        self.line_combo = QComboBox(self)
-        self.line_combo.addItems(["none", "LF", "CRLF"])
-        self.line_combo.setCurrentText(config["line_ending"])
+        self.command_edit = QLineEdit(config["command_name"], self)
+        self.on_edit = QLineEdit(config["on_value"], self)
+        self.off_edit = QLineEdit(config["off_value"], self)
         self.repeat_spin = QSpinBox(self)
         self.repeat_spin.setRange(1, 1000)
         self.repeat_spin.setValue(config["repeat_count"])
-        self.form.addRow("Control Name", self.title_edit)
-        self.form.addRow("ON Command", self.on_edit)
-        self.form.addRow("OFF Command", self.off_edit)
-        self.form.addRow("Line Ending", self.line_combo)
+        self.checksum_combo = QComboBox(self)
+        self.checksum_combo.addItems(["none", "sum8", "crc8", "crc16-xmodem"])
+        self.checksum_combo.setCurrentText(config["checksum"])
+        self.joiner_edit = QLineEdit(config["joiner"], self)
+        self.line_combo = QComboBox(self)
+        self.line_combo.addItems(["none", "LF", "CRLF"])
+        self.line_combo.setCurrentText(config["line_ending"])
+        self.ascii_check = QCheckBox(self)
+        self.ascii_check.setChecked(config["ascii_mode"])
+        self.form.addRow("Command Name", self.command_edit)
+        self.form.addRow("ON Value", self.on_edit)
+        self.form.addRow("OFF Value", self.off_edit)
         self.form.addRow("Repeat", self.repeat_spin)
+        self.form.addRow("Checksum", self.checksum_combo)
+        self.form.addRow("Joiner", self.joiner_edit)
+        self.form.addRow("Line Ending", self.line_combo)
+        self.form.addRow("ASCII Mode", self.ascii_check)
 
     def accept(self):
         self._result = {
-            "title": self.title_edit.text().strip() or "Toggle",
-            "on_command": self.on_edit.text().strip() or "ON",
-            "off_command": self.off_edit.text().strip() or "OFF",
-            "line_ending": self.line_combo.currentText(),
+            "command_name": self.command_edit.text().strip() or "Toggle",
+            "on_value": self.on_edit.text().strip() or "1",
+            "off_value": self.off_edit.text().strip() or "0",
             "repeat_count": self.repeat_spin.value(),
+            "checksum": self.checksum_combo.currentText(),
+            "joiner": self.joiner_edit.text() or ":",
+            "line_ending": self.line_combo.currentText(),
+            "ascii_mode": self.ascii_check.isChecked(),
         }
         super().accept()
 
