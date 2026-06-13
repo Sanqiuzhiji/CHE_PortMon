@@ -431,8 +431,8 @@ class ModePlotControl(BasePlotControl):
         super().__init__("Mode", control_id=control_id, parent=parent)
         self.control_type = "mode"
         self._command_name = "Mode"
-        self._values = ["0", "1", "2", "3"]
-        self._labels = ["idle", "ready", "run", "44"]
+        self._values = ["0", "1", "2"]
+        self._labels = ["idle", "ready", "run"]
         self._repeat_count = 1
         self._checksum = "none"
         self._joiner = ":"
