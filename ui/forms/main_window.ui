@@ -25,6 +25,7 @@
        <property name="bottomMargin"><number>16</number></property>
        <item><widget class="QLabel" name="appTitleLabel"><property name="text"><string>CHE PortMon</string></property></widget></item>
        <item><widget class="QPushButton" name="connectionNavButton"><property name="text"><string>Connection</string></property></widget></item>
+       <item><widget class="QPushButton" name="plotNavButton"><property name="text"><string>Plot</string></property></widget></item>
        <item><widget class="QPushButton" name="protocolEditorNavButton"><property name="text"><string>Protocol Editor</string></property></widget></item>
        <item><widget class="QPushButton" name="functionNavButton"><property name="text"><string>函数发生器</string></property></widget></item>
        <item><widget class="QPushButton" name="settingsNavButton"><property name="text"><string>设置</string></property></widget></item>

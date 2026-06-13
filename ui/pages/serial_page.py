@@ -14,7 +14,6 @@ from PyQt5.QtWidgets import (
     QRadioButton,
     QSpinBox,
     QSplitter,
-    QToolButton,
     QVBoxLayout,
     QWidget,
     QWidgetAction,
@@ -112,7 +111,7 @@ class UartWidget(QWidget):
         self.ui.dataBitsComboBox.setCurrentText("数据位 8")
         self.ui.parityComboBox.addItems(["校验位 无", "校验位 奇", "校验位 偶"])
         self.ui.stopBitsComboBox.addItems(["停止位 1", "停止位 1.5", "停止位 2"])
-        self.ui.dataFormatComboBox.addItems(["RawData", "CustomBinary"])
+        self.ui.dataFormatComboBox.addItems(["RawData", "CustomBinary", "JustFloat"])
         self._refresh_protocol_options()
         self._update_protocol_combo_enabled()
         self.ui.displayModeComboBox.addItems(["UTF-8", "Log"])
@@ -216,23 +215,14 @@ class UartWidget(QWidget):
 
     def _init_send_menu_button(self):
         original_button = self.ui.sendButton
-        self.send_tool_button = QToolButton(self.ui.sendBarFrame)
-        self.send_tool_button.setObjectName("sendToolButton")
-        self.send_tool_button.setText("Send")
-        self.send_tool_button.setPopupMode(QToolButton.MenuButtonPopup)
-        self.send_tool_button.setToolButtonStyle(Qt.ToolButtonTextOnly)
-        self.send_tool_button.setSizePolicy(original_button.sizePolicy())
+        original_button.setContextMenuPolicy(Qt.CustomContextMenu)
+        original_button.setToolTip("左键发送，右键打开发送设置")
 
-        index = self.ui.sendBarLayout.indexOf(original_button)
-        self.ui.sendBarLayout.removeWidget(original_button)
-        original_button.hide()
-        original_button.deleteLater()
-        self.ui.sendButton = self.send_tool_button
-        self.ui.sendBarLayout.insertWidget(index, self.send_tool_button)
-
-        self.send_menu = QMenu(self.send_tool_button)
+        self.send_menu = QMenu(original_button)
         self.send_menu.setObjectName("sendSettingsMenu")
-        self.send_tool_button.setMenu(self.send_menu)
+        original_button.customContextMenuRequested.connect(
+            lambda pos, button=original_button: self.send_menu.exec_(button.mapToGlobal(pos))
+        )
         self._build_send_menu()
 
     def _build_send_menu(self):
@@ -423,6 +413,9 @@ class UartWidget(QWidget):
         if data:
             return str(data).strip()
         return self.ui.portComboBox.currentText().split(" - ", 1)[0].strip()
+
+    def current_data_format(self):
+        return self.ui.dataFormatComboBox.currentText().strip()
 
     def current_baudrate(self):
         return self.ui.baudComboBox.currentText().strip() or "115200"

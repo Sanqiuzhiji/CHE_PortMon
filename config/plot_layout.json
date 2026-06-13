@@ -1,0 +1,64 @@
+{
+  "pages": [
+    {
+      "name": "Page 1",
+      "grid_size": 20,
+      "snap_to_grid": true,
+      "controls": [
+        {
+          "id": "163eb070111c466d816029519df35da5",
+          "type": "slider",
+          "x": 20,
+          "y": 20,
+          "w": 240,
+          "h": 130,
+          "config": {
+            "command_name": "Serial Cmd",
+            "min_value": -100.0,
+            "max_value": 100.0,
+            "step": 1.0,
+            "repeat_count": 1,
+            "checksum": "none",
+            "joiner": ":",
+            "format": "%.3f",
+            "line_ending": "LF",
+            "ascii_mode": false
+          }
+        },
+        {
+          "id": "a903ff328eaf44ceaa511e07d3cf3fe5",
+          "type": "toggle",
+          "x": 20,
+          "y": 180,
+          "w": 160,
+          "h": 110,
+          "config": {
+            "title": "Toggle",
+            "on_command": "ON",
+            "off_command": "OFF",
+            "line_ending": "LF",
+            "repeat_count": 1
+          }
+        },
+        {
+          "id": "117d9ad1d08d419288806bafa8b1c9d8",
+          "type": "mode",
+          "x": 300,
+          "y": 20,
+          "w": 240,
+          "h": 130,
+          "config": {
+            "command_name": "Mode",
+            "values": "0;1;2;3",
+            "labels": "idle;ready;run;44",
+            "repeat_count": 1,
+            "checksum": "none",
+            "joiner": ":",
+            "line_ending": "LF",
+            "ascii_mode": false
+          }
+        }
+      ]
+    }
+  ]
+}

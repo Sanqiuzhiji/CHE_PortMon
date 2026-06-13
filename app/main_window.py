@@ -4,10 +4,12 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox
 
 from controllers.protocol_editor_controller import ProtocolEditorController
 from services.config_service import ConfigService
+from services.channel_manager import ChannelManager
 from services.theme_service import ThemeService
 from ui.generated.main_window_ui import Ui_MainWindow
 from ui.pages.connection_page import ConnectionPage
 from ui.pages.function_page import FunctionPage
+from ui.pages.plot_page import PlotPage
 from ui.pages.protocol_editor_page import ProtocolEditorPage
 from ui.pages.settings_page import SettingsPage
 from utils.format_utils import text_to_bytes
@@ -32,6 +34,7 @@ class MainWindow(QMainWindow):
         self.function_index = 0
         self.function_send_timer = QTimer(self)
         self.function_send_timer.timeout.connect(self._send_next_function_point)
+        self.channel_manager = ChannelManager(self)
 
         self._create_pages()
         self._connect_signals()
@@ -42,22 +45,24 @@ class MainWindow(QMainWindow):
         self._update_status()
 
     def _create_pages(self):
-        self.connection_page = ConnectionPage()
+        self.connection_page = ConnectionPage(channel_manager=self.channel_manager)
+        self.plot_page = PlotPage(channel_manager=self.channel_manager)
         self.protocol_editor_page = ProtocolEditorPage()
         self.protocol_editor_controller = ProtocolEditorController(self.protocol_editor_page)
         self.function_page = FunctionPage()
         self.settings_page = SettingsPage()
         self.uart_controller = self.connection_page.uart_controller
 
-        for page in (self.connection_page, self.protocol_editor_page, self.function_page, self.settings_page):
+        for page in (self.connection_page, self.plot_page, self.protocol_editor_page, self.function_page, self.settings_page):
             self.ui.pageStack.addWidget(page)
 
     def _connect_signals(self):
         nav_pairs = [
             (self.ui.connectionNavButton, 0),
-            (self.ui.protocolEditorNavButton, 1),
-            (self.ui.functionNavButton, 2),
-            (self.ui.settingsNavButton, 3),
+            (self.ui.plotNavButton, 1),
+            (self.ui.protocolEditorNavButton, 2),
+            (self.ui.functionNavButton, 3),
+            (self.ui.settingsNavButton, 4),
         ]
         self.nav_buttons = [button for button, _ in nav_pairs]
         for button, index in nav_pairs:
@@ -70,6 +75,7 @@ class MainWindow(QMainWindow):
         self.function_page.preview_requested.connect(self._preview_function)
         self.function_page.send_requested.connect(self._start_function_send)
         self.function_page.stop_requested.connect(self._stop_function_send)
+        self.plot_page.command_generated.connect(self._send_plot_command)
 
         self.settings_page.save_requested.connect(self._save_settings)
 
@@ -152,8 +158,34 @@ class MainWindow(QMainWindow):
             self._stop_function_send()
             return
         _, y_value = self.function_points[self.function_index]
-        self.uart_controller.send(text_to_bytes(f"{y_value:.6f}\n"))
+        self._send_uart_payload(f"{y_value:.6f}\n")
         self.function_index += 1
+
+    def _send_uart_payload(self, payload):
+        if not self.uart_controller.is_open():
+            self._show_error("璇峰厛鎵撳紑涓插彛")
+            return
+        if isinstance(payload, bytes):
+            data = payload
+        else:
+            data = text_to_bytes(str(payload))
+        self.uart_controller.send_bytes(data)
+
+    def _send_plot_command(self, payload):
+        if not self.uart_controller.is_open():
+            self._show_error("请先打开串口")
+            return
+
+        repeat_count = max(1, int(getattr(payload, "repeat_count", 1)))
+        raw_payload = getattr(payload, "payload", payload)
+        if isinstance(raw_payload, bytes):
+            data = raw_payload
+        else:
+            data = text_to_bytes(str(raw_payload))
+
+        for _ in range(repeat_count):
+            if not self.uart_controller.send_bytes(data):
+                break
 
     def _stop_function_send(self):
         self.function_send_timer.stop()

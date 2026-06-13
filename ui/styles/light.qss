@@ -413,3 +413,86 @@ QLabel#protocolFieldDragHandle {
     font-size: 10px;
     padding: 2px 5px;
 }
+
+QLabel#plotTitleLabel {
+    color: #111827;
+    font-size: 22px;
+    font-weight: 700;
+    min-width: 120px;
+}
+
+QFrame#plotToolbarFrame,
+QWidget#plotCanvas,
+QWidget#plotChannelPanel {
+    background: #ffffff;
+    border: 1px solid #d7dde5;
+    border-radius: 6px;
+}
+
+QTabWidget#plotPageTabs {
+    background: #ffffff;
+}
+
+QTabWidget#plotPageTabs::pane {
+    background: #ffffff;
+    border: 0;
+}
+
+QTabWidget#plotPageTabs QTabBar::tab {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    color: #475467;
+    font-size: 12px;
+    font-weight: 600;
+    margin-right: 8px;
+    min-height: 24px;
+    min-width: 64px;
+    padding: 4px 18px;
+}
+
+QTabWidget#plotPageTabs QTabBar::tab:selected {
+    background: #e8f1ff;
+    border-color: #2d8cff;
+    color: #1d4ed8;
+}
+
+QWidget#plotChannelRow {
+    background: #fbfdff;
+    border: 1px solid #d7dde5;
+    border-radius: 5px;
+}
+
+QWidget#plotChannelRow:disabled {
+    color: #98a2b3;
+}
+
+QWidget#plotControl {
+    background: #ffffff;
+    border: 2px solid transparent;
+    border-radius: 8px;
+}
+
+QWidget#plotControl[selected="true"] {
+    border-color: #2d8cff;
+    background: #e8f1ff;
+}
+
+QLabel#plotControlHeader {
+    background: #f8fafc;
+    border-radius: 4px;
+    color: #344054;
+    font-weight: 700;
+    padding: 4px 6px;
+}
+
+QLabel#plotControlPreviewLabel,
+QLabel#plotControlValueLabel {
+    color: #344054;
+}
+
+QLabel#plotControlResizeHandle {
+    color: #667085;
+    font-size: 11px;
+    padding: 0px;
+}

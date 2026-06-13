@@ -16,10 +16,10 @@ class ConnectionPage(QWidget):
     uart_stats_changed = pyqtSignal(int, int)
     uart_error = pyqtSignal(str)
 
-    def __init__(self):
+    def __init__(self, channel_manager=None):
         super().__init__()
         self.uart_widget = UartConnectionPage()
-        self.uart_controller = UartController(self.uart_widget, parent=self)
+        self.uart_controller = UartController(self.uart_widget, channel_manager=channel_manager, parent=self)
 
         self._build_ui()
         self._connect_signals()
