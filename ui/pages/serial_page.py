@@ -25,7 +25,7 @@ from ui.generated.serial_page_ui import Ui_SerialPage
 from utils.format_utils import bytes_to_hex, bytes_to_hex_keep_newlines, current_timestamp, hex_to_bytes
 
 
-class SerialPage(QWidget):
+class UartWidget(QWidget):
     refresh_ports_requested = pyqtSignal()
     open_port_requested = pyqtSignal(object)
     close_port_requested = pyqtSignal()
@@ -666,3 +666,6 @@ class SerialPage(QWidget):
         )
         if path:
             self.save_receive_requested.emit(path)
+
+
+SerialPage = UartWidget
