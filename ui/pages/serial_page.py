@@ -21,8 +21,37 @@ from PyQt5.QtWidgets import (
 )
 
 from models.serial_config import ReceiveOptions, SerialConfig
+from services.protocol_parse_service import ProtocolParseService
+from services.protocol_service import ProtocolService
 from ui.generated.serial_page_ui import Ui_SerialPage
 from utils.format_utils import bytes_to_hex, bytes_to_hex_keep_newlines, current_timestamp, hex_to_bytes
+
+
+class FormatToggleButton(QPushButton):
+    currentTextChanged = pyqtSignal(str)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setCheckable(True)
+        self.toggled.connect(self._handle_toggled)
+        self._update_text()
+
+    def currentText(self):
+        return "HEX" if self.isChecked() else "ABC"
+
+    def setCurrentText(self, text):
+        checked = text == "HEX"
+        if self.isChecked() == checked:
+            self._update_text()
+            return
+        self.setChecked(checked)
+
+    def _handle_toggled(self, *_args):
+        self._update_text()
+        self.currentTextChanged.emit(self.currentText())
+
+    def _update_text(self):
+        self.setText(self.currentText())
 
 
 class UartWidget(QWidget):
@@ -45,10 +74,13 @@ class UartWidget(QWidget):
         self._send_format = "ABC"
         self._continuous_send_count = 0
         self._hex_hint_elapsed = 0
+        self.protocol_service = ProtocolService()
+        self.protocol_parse_service = ProtocolParseService()
 
         self._init_resizable_io_area()
         self._init_options()
         self._init_receive_toggle_buttons()
+        self._init_send_format_toggle_button()
         self._init_send_menu_button()
         self._init_hex_hint_popup()
         self._init_continuous_send_timer()
@@ -80,14 +112,30 @@ class UartWidget(QWidget):
         self.ui.dataBitsComboBox.setCurrentText("数据位 8")
         self.ui.parityComboBox.addItems(["校验位 无", "校验位 奇", "校验位 偶"])
         self.ui.stopBitsComboBox.addItems(["停止位 1", "停止位 1.5", "停止位 2"])
-        self.ui.dataFormatComboBox.addItems(["RawData"])
-        self.ui.protocolComboBox.addItems(["Test_Protocol2"])
+        self.ui.dataFormatComboBox.addItems(["RawData", "CustomBinary"])
+        self._refresh_protocol_options()
+        self._update_protocol_combo_enabled()
         self.ui.displayModeComboBox.addItems(["UTF-8", "Log"])
         self.ui.sendFormatComboBox.addItems(["ABC", "HEX"])
         self._send_format = self.ui.sendFormatComboBox.currentText()
         self.ui.checksumComboBox.addItems(["crc8", "none"])
         self.ui.lineEndingComboBox.addItems(["None", "\\n", "\\r\\n"])
         self.ui.sendPlainTextEdit.setTabChangesFocus(True)
+
+    def _init_send_format_toggle_button(self):
+        original_combo = self.ui.sendFormatComboBox
+        toggle_button = FormatToggleButton(self.ui.sendBarFrame)
+        toggle_button.setObjectName("sendFormatToggleButton")
+        toggle_button.setCurrentText(original_combo.currentText())
+        toggle_button.setSizePolicy(original_combo.sizePolicy())
+
+        index = self.ui.sendBarLayout.indexOf(original_combo)
+        self.ui.sendBarLayout.removeWidget(original_combo)
+        original_combo.hide()
+        original_combo.deleteLater()
+        self.ui.sendFormatComboBox = toggle_button
+        self.ui.sendBarLayout.insertWidget(index, toggle_button)
+        self._send_format = toggle_button.currentText()
 
     def _init_receive_toggle_buttons(self):
         self.ui.hexToggleButton.setCheckable(True)
@@ -287,6 +335,7 @@ class UartWidget(QWidget):
         self.ui.hexToggleButton.toggled.connect(self._render_receive_history)
         self.ui.timestampButton.toggled.connect(self._render_receive_history)
         self.ui.displayModeComboBox.currentTextChanged.connect(self._render_receive_history)
+        self.ui.dataFormatComboBox.currentTextChanged.connect(self._handle_data_format_changed)
         self.ui.sendFormatComboBox.currentTextChanged.connect(self._handle_send_format_changed)
         self.ui.sendPlainTextEdit.textChanged.connect(self._format_hex_send_text)
         self.ui.sendPlainTextEdit.installEventFilter(self)
@@ -328,6 +377,10 @@ class UartWidget(QWidget):
 
     def set_default_save_path(self, path):
         self.default_save_path = path or ""
+
+    def refresh_protocol_options(self):
+        self._refresh_protocol_options()
+        self._update_protocol_combo_enabled()
 
     def set_refreshing(self, refreshing):
         self.ui.refreshButton.setEnabled(not refreshing)
@@ -409,6 +462,23 @@ class UartWidget(QWidget):
         text = self._format_received_chunk(raw_data, self._received_chunks[-1][1])
         self._append_receive_text(text)
 
+    def _refresh_protocol_options(self):
+        current = self.ui.protocolComboBox.currentText()
+        self.ui.protocolComboBox.blockSignals(True)
+        self.ui.protocolComboBox.clear()
+        self.ui.protocolComboBox.addItems(self.protocol_service.list_protocols())
+        if current:
+            self.ui.protocolComboBox.setCurrentText(current)
+        self.ui.protocolComboBox.blockSignals(False)
+
+    def _handle_data_format_changed(self, *_args):
+        self._refresh_protocol_options()
+        self._update_protocol_combo_enabled()
+        self._render_receive_history()
+
+    def _update_protocol_combo_enabled(self):
+        self.ui.protocolComboBox.setEnabled(self.ui.dataFormatComboBox.currentText() == "CustomBinary")
+
     def clear_receive_data(self):
         self._received_chunks.clear()
         self.ui.receivePlainTextEdit.clear()
@@ -443,15 +513,31 @@ class UartWidget(QWidget):
             self.ui.receivePlainTextEdit.ensureCursorVisible()
 
     def _format_received_chunk(self, data, timestamp):
-        if self.ui.hexToggleButton.isChecked():
+        custom_binary = self.ui.dataFormatComboBox.currentText() == "CustomBinary"
+        if custom_binary:
+            text = self._format_custom_binary_chunk(data)
+        elif self.ui.hexToggleButton.isChecked():
             text = bytes_to_hex_keep_newlines(data)
         else:
             text = bytes(data).decode("utf-8", errors="ignore")
         if self.ui.timestampButton.isChecked():
             text = timestamp + text
-        if self.ui.displayModeComboBox.currentText() == "Log" and not text.endswith("\n"):
+        if (custom_binary or self.ui.displayModeComboBox.currentText() == "Log") and not text.endswith("\n"):
             text += "\n"
         return text
+
+    def _format_custom_binary_chunk(self, data):
+        protocol_name = self.ui.protocolComboBox.currentText()
+        if not protocol_name:
+            return "<no protocol selected>"
+        try:
+            protocol = self.protocol_service.load_protocol(protocol_name)
+            values = self.protocol_parse_service.parse_data_fields(protocol, bytes(data))
+        except Exception as exc:
+            return f"<parse failed: {exc}>"
+        if not values:
+            return "<no data fields>"
+        return " | ".join(f"{name}: {value}" for name, value in values)
 
     def _request_toggle_connection(self):
         if self._connected:

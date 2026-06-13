@@ -2,11 +2,13 @@
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox
 
+from controllers.protocol_editor_controller import ProtocolEditorController
 from services.config_service import ConfigService
 from services.theme_service import ThemeService
 from ui.generated.main_window_ui import Ui_MainWindow
 from ui.pages.connection_page import ConnectionPage
 from ui.pages.function_page import FunctionPage
+from ui.pages.protocol_editor_page import ProtocolEditorPage
 from ui.pages.settings_page import SettingsPage
 from utils.format_utils import text_to_bytes
 from utils.function_generator import generate_function_points
@@ -41,18 +43,21 @@ class MainWindow(QMainWindow):
 
     def _create_pages(self):
         self.connection_page = ConnectionPage()
+        self.protocol_editor_page = ProtocolEditorPage()
+        self.protocol_editor_controller = ProtocolEditorController(self.protocol_editor_page)
         self.function_page = FunctionPage()
         self.settings_page = SettingsPage()
         self.uart_controller = self.connection_page.uart_controller
 
-        for page in (self.connection_page, self.function_page, self.settings_page):
+        for page in (self.connection_page, self.protocol_editor_page, self.function_page, self.settings_page):
             self.ui.pageStack.addWidget(page)
 
     def _connect_signals(self):
         nav_pairs = [
             (self.ui.connectionNavButton, 0),
-            (self.ui.functionNavButton, 1),
-            (self.ui.settingsNavButton, 2),
+            (self.ui.protocolEditorNavButton, 1),
+            (self.ui.functionNavButton, 2),
+            (self.ui.settingsNavButton, 3),
         ]
         self.nav_buttons = [button for button, _ in nav_pairs]
         for button, index in nav_pairs:
@@ -92,6 +97,8 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "设置", "设置已保存")
 
     def _select_page(self, index):
+        if index == 0:
+            self.connection_page.refresh_uart_protocols()
         self.ui.pageStack.setCurrentIndex(index)
         for button_index, button in enumerate(self.nav_buttons):
             button.setProperty("active", button_index == index)

@@ -61,5 +61,8 @@ class ConnectionPage(QWidget):
     def refresh_ports(self):
         self.uart_controller.refresh_ports()
 
+    def refresh_uart_protocols(self):
+        self.uart_widget.refresh_protocol_options()
+
     def auto_connect_uart(self):
         self.uart_controller.auto_connect()

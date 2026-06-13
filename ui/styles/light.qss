@@ -188,6 +188,20 @@ QPushButton#toggleButton[connected="true"] {
     color: #be123c;
 }
 
+QPushButton#hexToggleButton,
+QPushButton#sendFormatToggleButton,
+QPushButton#timestampButton,
+QPushButton#autoScrollButton {
+    min-height: 24px;
+    padding: 3px 8px;
+}
+
+QPushButton#hexToggleButton,
+QPushButton#sendFormatToggleButton {
+    font-weight: 600;
+    min-width: 48px;
+}
+
 QComboBox,
 QLineEdit,
 QSpinBox,
@@ -259,4 +273,143 @@ QCheckBox::indicator:checked,
 QRadioButton::indicator:checked {
     background: #2d8cff;
     border-color: #2d8cff;
+}
+
+QLabel#protocolTitleLabel {
+    color: #111827;
+    font-size: 22px;
+    font-weight: 700;
+    min-width: 180px;
+}
+
+QFrame#protocolToolbarFrame {
+    background: #f4f6f8;
+}
+
+QFrame#libraryContainer,
+QFrame#canvasContainer,
+QFrame#propertyContainer,
+QWidget#protocolLibraryPanel,
+QWidget#protocolCanvasPanel,
+QWidget#protocolPropertyPanel {
+    background: #ffffff;
+    border: 1px solid #d7dde5;
+    border-radius: 6px;
+}
+
+QLabel#protocolPanelTitleLabel {
+    background: transparent;
+    color: #111827;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+QWidget#protocolFieldTemplateButton {
+    background: #ffffff;
+    border: 1px solid #d7dde5;
+    border-radius: 6px;
+}
+
+QWidget#protocolFieldTemplateButton:hover {
+    background: #eef4ff;
+    border-color: #2d8cff;
+}
+
+QLabel#protocolTemplateTitleLabel {
+    background: transparent;
+    color: #111827;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+QLabel#protocolTemplateMetaLabel {
+    background: transparent;
+    color: #667085;
+    font-size: 11px;
+}
+
+QScrollArea#protocolCanvasScrollArea {
+    background: #ffffff;
+    border: 0;
+}
+
+QScrollArea#protocolCanvasScrollArea QWidget {
+    background: #ffffff;
+}
+
+QLabel#protocolFrameLabel {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: #111827;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 4px 8px;
+}
+
+QLabel#protocolFrameLabel[selected="true"] {
+    background: #e8f1ff;
+    border-color: #2d8cff;
+    color: #1d4ed8;
+}
+
+QLabel#protocolFrameDragHandle {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    color: #667085;
+    font-size: 11px;
+    padding: 3px 8px;
+}
+
+QWidget#protocolFieldBlock {
+    background: #fbfdff;
+    border: 2px solid transparent;
+    border-radius: 7px;
+    min-width: 128px;
+}
+
+QWidget#protocolFieldBlock[selected="true"] {
+    border: 2px solid #2d8cff;
+    background: #e8f1ff;
+}
+
+QFrame#protocolInsertIndicator {
+    background: #2d8cff;
+    border: 0;
+    min-height: 84px;
+    max-height: 120px;
+}
+
+QFrame#protocolFrameInsertIndicator {
+    background: #2d8cff;
+    border: 0;
+    min-height: 3px;
+    max-height: 3px;
+}
+
+QLabel#protocolFieldNameLabel,
+QLabel#protocolFieldMetaLabel,
+QLabel#protocolFieldRangeLabel {
+    background: transparent;
+}
+
+QLabel#protocolFieldNameLabel {
+    color: #111827;
+    font-weight: 700;
+}
+
+QLabel#protocolFieldMetaLabel,
+QLabel#protocolFieldRangeLabel {
+    color: #667085;
+    font-size: 11px;
+}
+
+QLabel#protocolFieldDragHandle {
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 4px;
+    color: #667085;
+    font-size: 10px;
+    padding: 2px 5px;
 }

@@ -1,6 +1,6 @@
 {
   "theme": "dark",
   "default_baudrate": "115200",
-  "auto_connect": false,
+  "auto_connect": true,
   "default_save_path": "G:/Desk/Common_Folders/CHE_PortMon"
 }
