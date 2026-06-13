@@ -121,6 +121,21 @@ class UartWidget(QWidget):
         self.ui.checksumComboBox.addItems(["crc8", "none"])
         self.ui.lineEndingComboBox.addItems(["None", "\\n", "\\r\\n"])
         self.ui.sendPlainTextEdit.setTabChangesFocus(True)
+        self.ui.protocolComboBox.setStyleSheet("""
+        QComboBox {
+            background-color: #2b2b2b;
+            color: #ffffff;
+            border: 1px solid #555555;
+            border-radius: 4px;
+            padding: 4px 8px;
+        }
+
+        QComboBox:disabled {
+            background-color: #3a3a3a;
+            color: #888888;
+            border: 1px solid #444444;
+        }
+        """)
 
     def _init_send_format_toggle_button(self):
         original_combo = self.ui.sendFormatComboBox

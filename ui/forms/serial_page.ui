@@ -185,7 +185,11 @@
        <widget class="QComboBox" name="dataFormatComboBox"/>
       </item>
       <item>
-       <widget class="QComboBox" name="protocolComboBox"/>
+       <widget class="QComboBox" name="protocolComboBox">
+        <property name="styleSheet">
+         <string notr="true"/>
+        </property>
+       </widget>
       </item>
       <item>
        <widget class="QLabel" name="bufferLabel">

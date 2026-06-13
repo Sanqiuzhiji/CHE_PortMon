@@ -195,7 +195,10 @@ class ProtocolEditorController:
             self.current_protocol_name = protocol.name
             self.page.set_protocol_names([item.name for item in self.protocols], protocol.name)
         self.selected_field_id = field_id
-        self._refresh_view()
+        self.page.canvas.set_selected_field(protocol_name, field_id)
+        field_item = self._field_by_id(field_id)
+        if field_item is not None:
+            self.page.property_panel.show_field(field_item)
 
     def update_protocol_properties(self, values):
         if self.current_protocol is None:

@@ -167,6 +167,12 @@ class ProtocolNameLabel(QLabel):
             self.clicked.emit(self.protocol_name)
         super().mouseReleaseEvent(event)
 
+    def set_selected(self, selected):
+        self.setProperty("selected", selected)
+        self.style().unpolish(self)
+        self.style().polish(self)
+        self.update()
+
 
 class ProtocolFieldBlock(QWidget):
     clicked = pyqtSignal(str, str)
@@ -181,6 +187,7 @@ class ProtocolFieldBlock(QWidget):
         self._dragging = False
         self.setObjectName("protocolFieldBlock")
         self.setProperty("selected", selected)
+        self.setAttribute(Qt.WA_StyledBackground, True)
         self.setCursor(Qt.OpenHandCursor)
         self._apply_selected_style(selected)
         self._build_ui()
@@ -190,7 +197,7 @@ class ProtocolFieldBlock(QWidget):
             self.setStyleSheet(
                 "QWidget#protocolFieldBlock {"
                 "background: #22364d;"
-                "border: 7px solid #2d8cff;"
+                "border: 3px solid #2d8cff;"
                 "border-radius: 7px;"
                 "min-width: 128px;"
                 "}"
@@ -199,11 +206,18 @@ class ProtocolFieldBlock(QWidget):
         self.setStyleSheet(
             "QWidget#protocolFieldBlock {"
             "background: #2b2b2b;"
-            "border: 2px solid transparent;"
+            "border: 3px solid transparent;"
             "border-radius: 7px;"
             "min-width: 128px;"
             "}"
         )
+
+    def set_selected(self, selected):
+        self.setProperty("selected", selected)
+        self._apply_selected_style(selected)
+        self.style().unpolish(self)
+        self.style().polish(self)
+        self.update()
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
@@ -271,6 +285,7 @@ class ProtocolFrameWidget(QWidget):
         super().__init__(parent)
         self.protocol = protocol
         self._field_blocks = []
+        self.frame_label = None
         self.setObjectName("protocolFrameWidget")
         self.setProperty("selected", protocol.name == selected_protocol_name)
         self._build_ui(selected_protocol_name, selected_field_id)
@@ -283,11 +298,11 @@ class ProtocolFrameWidget(QWidget):
         header_layout = QHBoxLayout()
         header_layout.setContentsMargins(0, 0, 0, 0)
         header_layout.setSpacing(8)
-        frame_label = ProtocolNameLabel(self.protocol.name, self.protocol.name == selected_protocol_name, self)
-        frame_label.clicked.connect(self.frame_selected)
-        frame_label.drag_moved.connect(self.protocol_drag_moved)
-        frame_label.drag_finished.connect(self.protocol_drag_finished)
-        header_layout.addWidget(frame_label)
+        self.frame_label = ProtocolNameLabel(self.protocol.name, self.protocol.name == selected_protocol_name, self)
+        self.frame_label.clicked.connect(self.frame_selected)
+        self.frame_label.drag_moved.connect(self.protocol_drag_moved)
+        self.frame_label.drag_finished.connect(self.protocol_drag_finished)
+        header_layout.addWidget(self.frame_label)
         header_layout.addStretch(1)
         frame_layout.addLayout(header_layout)
 
@@ -332,6 +347,14 @@ class ProtocolFrameWidget(QWidget):
 
     def hide_insert_indicator(self):
         self.insert_indicator.hide()
+
+    def set_selected_field(self, selected_field_id):
+        for block in self._field_blocks:
+            block.set_selected(block.field_item.id == selected_field_id)
+
+    def set_selected_protocol(self, selected_protocol_name):
+        if self.frame_label is not None:
+            self.frame_label.set_selected(self.protocol.name == selected_protocol_name)
 
     def _show_insert_indicator(self, index):
         self.field_row.removeWidget(self.insert_indicator)
@@ -395,6 +418,16 @@ class ProtocolCanvasWidget(QWidget):
             return
         target_index = frame.field_target_index_from_global(global_pos)
         self.field_template_dropped.emit(frame.protocol.name, dict(template), target_index)
+
+    def set_selected_field(self, protocol_name, field_id):
+        self.current_protocol_name = protocol_name or ""
+        self.selected_field_id = field_id or ""
+        for frame in self._frame_widgets:
+            frame.set_selected_protocol(protocol_name)
+            if frame.protocol.name == protocol_name:
+                frame.set_selected_field(field_id)
+            else:
+                frame.set_selected_field("")
 
     def _render(self):
         self._clear_layout(self.content_layout)
