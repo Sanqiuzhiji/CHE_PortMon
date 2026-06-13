@@ -299,8 +299,14 @@ class SerialPage(QWidget):
                 if self.enter_send_radio.isChecked() and not ctrl_pressed:
                     self._request_send_data()
                     return True
+                if self.enter_send_radio.isChecked() and ctrl_pressed:
+                    self._insert_send_newline()
+                    return True
                 if self.ctrl_enter_send_radio.isChecked() and ctrl_pressed:
                     self._request_send_data()
+                    return True
+                if self.ctrl_enter_send_radio.isChecked() and not ctrl_pressed:
+                    self._insert_send_newline()
                     return True
         return super().eventFilter(watched, event)
 
@@ -583,6 +589,11 @@ class SerialPage(QWidget):
         cursor.movePosition(QTextCursor.End)
         self.ui.sendPlainTextEdit.setTextCursor(cursor)
         self._send_text_guard = False
+
+    def _insert_send_newline(self):
+        cursor = self.ui.sendPlainTextEdit.textCursor()
+        cursor.insertText("\n")
+        self.ui.sendPlainTextEdit.setTextCursor(cursor)
 
     def _set_send_format(self, format_text):
         self._send_text_guard = True
