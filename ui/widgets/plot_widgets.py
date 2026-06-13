@@ -653,16 +653,27 @@ class PlotCanvas(QWidget):
         height = min(height, max(70, self.height() - control.y()))
         return QSize(width, height)
 
-    def add_control(self, control_type, pos=None, config=None, control_id=None):
-        control = create_plot_control(control_type, channel_manager=self.channel_manager, control_id=control_id, parent=self)
+    def add_control(self, control_type, pos=None, config=None, control_id=None, restore_geometry=False):
+        control = create_plot_control(
+            control_type,
+            channel_manager=self.channel_manager,
+            control_id=control_id,
+            parent=self,
+        )
+
         control.config_requested.connect(self._edit_control)
         control.delete_requested.connect(self.remove_control)
         control.command_generated.connect(self._forward_command)
+
         if config:
             control.apply_config(config)
+
         if pos is None:
             pos = QPoint(40 + 24 * len(self._controls), 40 + 20 * len(self._controls))
-        pos = self.adjust_control_position(control, pos)
+
+        if not restore_geometry:
+            pos = self.adjust_control_position(control, pos)
+
         control.move(pos)
         control.show()
         self._controls.append(control)

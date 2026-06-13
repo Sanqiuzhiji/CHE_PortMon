@@ -163,7 +163,7 @@ class MainWindow(QMainWindow):
 
     def _send_uart_payload(self, payload):
         if not self.uart_controller.is_open():
-            self._show_error("璇峰厛鎵撳紑涓插彛")
+            self._show_error("请先打开串口")
             return
         if isinstance(payload, bytes):
             data = payload

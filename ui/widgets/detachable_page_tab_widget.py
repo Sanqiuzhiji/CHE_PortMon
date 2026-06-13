@@ -15,31 +15,36 @@ class DetachablePageTabBar(QTabBar):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setMovable(True)
         self._press_pos = QPoint()
         self._press_index = -1
-        self._detached = False
         self._detach_threshold = 36
+        self._detach_started = False
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            self._press_pos = event.globalPos()
+            self._press_pos = event.pos()
             self._press_index = self.tabAt(event.pos())
-            self._detached = False
+            self._detach_started = False
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        if not (event.buttons() & Qt.LeftButton):
-            super().mouseMoveEvent(event)
-            return
-        if self._detached or self._press_index < 0:
-            super().mouseMoveEvent(event)
-            return
-        delta = event.globalPos() - self._press_pos
-        if abs(delta.y()) >= self._detach_threshold and abs(delta.y()) > abs(delta.x()):
-            self._detached = True
-            self.detach_requested.emit(self._press_index, event.globalPos())
-            return
+        if self._press_index >= 0 and not self._detach_started:
+            delta = event.pos() - self._press_pos
+            horizontal = abs(delta.x())
+            vertical = abs(delta.y())
+            if vertical >= self._detach_threshold and vertical > horizontal:
+                self._detach_started = True
+                self.detach_requested.emit(self._press_index, event.globalPos())
+                event.accept()
+                return
         super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._press_pos = QPoint()
+        self._press_index = -1
+        self._detach_started = False
+        super().mouseReleaseEvent(event)
 
     def contextMenuEvent(self, event):
         index = self.tabAt(event.pos())
@@ -74,7 +79,7 @@ class DetachablePageTabWidget(QTabWidget):
         self._tab_bar.detach_requested.connect(self.detach_tab)
         self.setTabBar(self._tab_bar)
         self.setMovable(True)
-        self._tab_bar.setMovable(True)
+        self.setDocumentMode(True)
         self.tabCloseRequested.connect(self.remove_tab)
 
     def add_page(self, key, title, widget):

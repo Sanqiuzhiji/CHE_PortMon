@@ -22,7 +22,6 @@ from services.plot_layout_service import PlotLayoutService
 from ui.widgets.detachable_page_tab_widget import DetachablePageTabWidget
 from ui.widgets.plot_widgets import PlotCanvas
 
-
 class PlotWorkspacePage(QWidget):
     def __init__(self, channel_manager=None, name="Page 1", parent=None):
         super().__init__(parent)
@@ -59,7 +58,7 @@ class PlotPage(QWidget):
         self._page_count = 0
         self._build_ui()
         self._connect_signals()
-        self._load_or_create_layout()
+        self._sync_empty_state()
 
     def _build_ui(self):
         self.root_layout = QVBoxLayout(self)
@@ -76,15 +75,15 @@ class PlotPage(QWidget):
         toolbar_layout.setContentsMargins(0, 0, 0, 0)
         toolbar_layout.setSpacing(8)
         self.new_page_button = QToolButton(self.toolbar_frame)
-        self.new_page_button.setText("New Page")
+        self.new_page_button.setText("新建页")
         self.delete_page_button = QToolButton(self.toolbar_frame)
-        self.delete_page_button.setText("Delete Page")
+        self.delete_page_button.setText("删除页")
         self.clear_page_button = QToolButton(self.toolbar_frame)
-        self.clear_page_button.setText("Clear Page")
+        self.clear_page_button.setText("清除页")
         self.save_layout_button = QToolButton(self.toolbar_frame)
-        self.save_layout_button.setText("Save Layout")
+        self.save_layout_button.setText("保存页")
         self.load_layout_button = QToolButton(self.toolbar_frame)
-        self.load_layout_button.setText("Import Layout")
+        self.load_layout_button.setText("导入页")
         for button in (
             self.new_page_button,
             self.delete_page_button,
@@ -137,8 +136,7 @@ class PlotPage(QWidget):
         self.snap_to_grid_check.toggled.connect(self._handle_snap_to_grid_changed)
 
     def _load_or_create_layout(self):
-        layout = self.layout_service.ensure_default_layout()
-        self._load_layout_data(layout)
+        self._sync_empty_state()
 
     def _handle_current_changed(self, *_args):
         current = self.current_page_widget()
@@ -153,6 +151,7 @@ class PlotPage(QWidget):
         page.canvas.set_grid_size(self.grid_size_spinbox.value())
         page.canvas.set_snap_to_grid(self.snap_to_grid_check.isChecked())
         self.page_tabs.add_page(page_name, page_name, page)
+        self._sync_empty_state()
         return page
 
     def _current_canvas(self):
@@ -191,9 +190,10 @@ class PlotPage(QWidget):
         return self.page_tabs.currentWidget()
 
     def delete_current_page(self):
-        if self.page_tabs.count() <= 1:
+        if self.page_tabs.count() == 0:
             return
         self.page_tabs.remove_tab(self.page_tabs.currentIndex())
+        self._sync_empty_state()
 
     def clear_current_page(self):
         current = self.current_page_widget()
@@ -201,21 +201,24 @@ class PlotPage(QWidget):
             current.clear_canvas()
 
     def save_layout(self):
-        path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save Plot Layout",
-            str(self.layout_service.path),
-            "Plot Layout (*.json);;All Files (*)",
-        )
-        if not path:
+        current = self.current_page_widget()
+        if current is None:
             return
-        if "." not in path.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]:
-            path += ".json"
-        layout = self._current_layout_data()
+
+        page_data = current.to_dict()
+        page_data["name"] = self.page_tabs.tabText(self.page_tabs.currentIndex())
+
         try:
-            self.layout_service.save_layout_to(path, layout)
+            path = self.layout_service.save_page(page_data)
         except OSError as exc:
-            QMessageBox.warning(self, "Save Plot Layout", f"Save failed: {exc}")
+            QMessageBox.warning(self, "Save Plot Page", f"Save failed: {exc}")
+            return
+
+        QMessageBox.information(
+            self,
+            "Save Plot Page",
+            f"已保存到：{path}",
+        )
 
     def _current_layout_data(self):
         layout = {"pages": []}
@@ -231,7 +234,7 @@ class PlotPage(QWidget):
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Import Plot Layout",
-            str(self.layout_service.path.parent),
+            str(self.layout_service.pages_dir),
             "Plot Layout (*.json);;All Files (*)",
         )
         if not path:
@@ -241,6 +244,8 @@ class PlotPage(QWidget):
         except (OSError, ValueError) as exc:
             QMessageBox.warning(self, "Import Plot Layout", f"Import failed: {exc}")
             return
+        if isinstance(layout, dict) and "pages" not in layout and isinstance(layout.get("controls"), list):
+            layout = {"pages": [layout]}
         if not isinstance(layout, dict) or not isinstance(layout.get("pages"), list):
             QMessageBox.warning(self, "Import Plot Layout", "Invalid plot layout file.")
             return
@@ -251,8 +256,6 @@ class PlotPage(QWidget):
         while self.page_tabs.count():
             self.page_tabs.remove_tab(0)
         pages = layout.get("pages") or []
-        if not pages:
-            pages = [{"name": "Page 1", "controls": []}]
         for page_data in pages:
             page = self.add_page(page_data.get("name", "Page"))
             page.canvas.set_grid_size(int(page_data.get("grid_size", 20)))
@@ -260,17 +263,32 @@ class PlotPage(QWidget):
             for control_data in page_data.get("controls", []):
                 control = page.canvas.add_control(
                     control_data.get("type", "toggle"),
-                    pos=QPoint(int(control_data.get("x", 40)), int(control_data.get("y", 40))),
+                    pos=QPoint(
+                        int(control_data.get("x", 40)),
+                        int(control_data.get("y", 40)),
+                    ),
                     config=control_data.get("config", {}),
                     control_id=control_data.get("id"),
+                    restore_geometry=True,
                 )
-                control.resize(int(control_data.get("w", control.width())), int(control_data.get("h", control.height())))
+
+                control.resize(
+                    int(control_data.get("w", control.width())),
+                    int(control_data.get("h", control.height())),
+                )
                 control.show()
-        if self.page_tabs.count() == 0:
-            self.add_page("Page 1")
         current = self.current_page_widget()
         if current is not None:
             self._sync_grid_controls_from_canvas(current.canvas)
+        self._sync_empty_state()
+
+    def _sync_empty_state(self):
+        has_pages = self.page_tabs.count() > 0
+        self.delete_page_button.setEnabled(has_pages)
+        self.clear_page_button.setEnabled(has_pages)
+        self.save_layout_button.setEnabled(has_pages)
+        self.grid_size_spinbox.setEnabled(has_pages)
+        self.snap_to_grid_check.setEnabled(has_pages)
 
 
 class PlotChannelRow(QFrame):

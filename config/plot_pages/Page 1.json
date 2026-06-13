@@ -1,0 +1,44 @@
+{
+  "name": "Page 1",
+  "grid_size": 20,
+  "snap_to_grid": true,
+  "controls": [
+    {
+      "id": "5c92a00a29c348a980f2da1a39b05287",
+      "type": "slider",
+      "x": 140,
+      "y": 60,
+      "w": 240,
+      "h": 130,
+      "config": {
+        "command_name": "Serial Cmd",
+        "min_value": -100.0,
+        "max_value": 100.0,
+        "step": 1.0,
+        "repeat_count": 1,
+        "checksum": "none",
+        "joiner": ":",
+        "format": "%.3f",
+        "line_ending": "LF",
+        "ascii_mode": false
+      }
+    },
+    {
+      "id": "cca2cf080aba469fbd156f358d6fbf44",
+      "type": "gauge",
+      "x": 440,
+      "y": 240,
+      "w": 200,
+      "h": 180,
+      "config": {
+        "channel_key": "CH0",
+        "use_custom_name": false,
+        "custom_name": "Gauge",
+        "min_value": -100.0,
+        "max_value": 100.0,
+        "precision": 1,
+        "unit": ""
+      }
+    }
+  ]
+}

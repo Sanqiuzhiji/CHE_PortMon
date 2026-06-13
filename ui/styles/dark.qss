@@ -614,6 +614,10 @@ QTabWidget#plotPageTabs::pane {
     border: 0;
 }
 
+QTabWidget#plotPageTabs QTabBar {
+    background: #252525;
+}
+
 QTabWidget#plotPageTabs QTabBar::tab {
     background: #303030;
     border: 1px solid #505050;
