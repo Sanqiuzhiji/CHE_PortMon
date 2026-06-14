@@ -417,6 +417,10 @@ class UartWidget(QWidget):
     def current_data_format(self):
         return self.ui.dataFormatComboBox.currentText().strip()
 
+    def plot_period_s(self):
+        value_s = float(self.ui.plotPeriodSpinBox.value()) / 1000.0
+        return value_s if value_s > 0 else 0.0002
+
     def current_baudrate(self):
         return self.ui.baudComboBox.currentText().strip() or "115200"
 

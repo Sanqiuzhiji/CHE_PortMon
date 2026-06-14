@@ -144,6 +144,9 @@ class PlotPage(QWidget):
             layout = {"pages": []}
         if isinstance(layout, dict) and layout.get("pages"):
             self._load_layout_data(layout)
+        else:
+            page = self.add_page("Page 1")
+            page.canvas.add_control("plot", QPoint(40, 40))
 
     def _handle_current_changed(self, *_args):
         current = self.current_page_widget()
@@ -274,8 +277,11 @@ class PlotPage(QWidget):
             page.canvas.set_grid_size(int(page_data.get("grid_size", 20)))
             page.canvas.set_snap_to_grid(bool(page_data.get("snap_to_grid", True)))
             for control_data in page_data.get("controls", []):
+                control_type = control_data.get("type", "toggle")
+                if control_type == "realtime_plot":
+                    control_type = "plot"
                 control = page.canvas.add_control(
-                    control_data.get("type", "toggle"),
+                    control_type,
                     pos=QPoint(
                         int(control_data.get("x", 40)),
                         int(control_data.get("y", 40)),

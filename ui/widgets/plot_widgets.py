@@ -130,6 +130,7 @@ class _ResizeHandle(QLabel):
 class BasePlotControl(QFrame):
     config_requested = pyqtSignal(object)
     delete_requested = pyqtSignal(object)
+    duplicate_requested = pyqtSignal(object)
     command_generated = pyqtSignal(object)
 
     def __init__(self, title="Control", control_id=None, parent=None):
@@ -253,10 +254,13 @@ class BasePlotControl(QFrame):
     def _show_context_menu(self, global_pos):
         menu = QMenu(self)
         config_action = menu.addAction("Config")
+        duplicate_action = menu.addAction("Duplicate")
         delete_action = menu.addAction("Delete")
         action = menu.exec_(global_pos)
         if action == config_action:
             self.config_requested.emit(self)
+        elif action == duplicate_action:
+            self.duplicate_requested.emit(self)
         elif action == delete_action:
             self.delete_requested.emit(self)
 
@@ -700,7 +704,7 @@ class GaugePlotControl(BasePlotControl):
 class RealtimeWavePlotControl(BasePlotControl):
     def __init__(self, channel_manager=None, control_id=None, parent=None):
         super().__init__("Realtime Plot", control_id=control_id, parent=parent)
-        self.control_type = "realtime_plot"
+        self.control_type = "plot"
         self.channel_manager = channel_manager
         self.plot_widget = RealtimePlotWidget(channel_manager=channel_manager, parent=self.body)
         self.body_layout.addWidget(self.plot_widget)
@@ -740,12 +744,22 @@ class RealtimeWavePlotControl(BasePlotControl):
             return
         super().mouseReleaseEvent(event)
 
+    def contextMenuEvent(self, event):
+        if self.body.geometry().contains(event.pos()):
+            if hasattr(self.parentWidget(), "select_control"):
+                self.parentWidget().select_control(self)
+            self.plot_widget.show_context_menu(event.globalPos())
+            event.accept()
+            return
+        super().contextMenuEvent(event)
+
 
 CONTROL_TYPES = {
     "toggle": TogglePlotControl,
     "slider": SliderPlotControl,
     "mode": ModePlotControl,
     "gauge": GaugePlotControl,
+    "plot": RealtimeWavePlotControl,
     "realtime_plot": RealtimeWavePlotControl,
 }
 
@@ -754,7 +768,7 @@ def create_plot_control(control_type, channel_manager=None, control_id=None, par
     control_cls = CONTROL_TYPES.get(control_type)
     if control_cls is None:
         raise ValueError(f"Unknown plot control type: {control_type}")
-    if control_type in ("gauge", "realtime_plot"):
+    if control_type in ("gauge", "plot", "realtime_plot"):
         return control_cls(channel_manager=channel_manager, control_id=control_id, parent=parent)
     return control_cls(control_id=control_id, parent=parent)
 
@@ -820,6 +834,7 @@ class PlotCanvas(QWidget):
 
         control.config_requested.connect(self._edit_control)
         control.delete_requested.connect(self.remove_control)
+        control.duplicate_requested.connect(self.duplicate_control)
         control.command_generated.connect(self._forward_command)
 
         if config:
@@ -844,6 +859,20 @@ class PlotCanvas(QWidget):
             self._selected_control = None
         control.deleteLater()
         self.update()
+
+    def duplicate_control(self, control):
+        if control not in self._controls:
+            return None
+        control_data = control.to_dict()
+        pos = QPoint(control.x() + self._grid_size, control.y() + self._grid_size)
+        duplicate = self.add_control(
+            control_data.get("type", "toggle"),
+            pos=pos,
+            config=control_data.get("config", {}),
+        )
+        duplicate.resize(control.size())
+        duplicate.show()
+        return duplicate
 
     def _forward_command(self, command):
         self.command_generated.emit(command)
@@ -900,7 +929,7 @@ class PlotCanvas(QWidget):
             return
         local_pos = self.mapFromGlobal(global_pos)
         if action == add_plot:
-            self.add_control("realtime_plot", local_pos)
+            self.add_control("plot", local_pos)
         elif action == add_slider:
             self.add_control("slider", local_pos)
         elif action == add_toggle:

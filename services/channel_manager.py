@@ -10,6 +10,9 @@ class ChannelManager(QObject):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._channels = []
+        self._sample_index = 0
+        self._sample_interval_s = 0.0002
+        self._latest_sample_timestamp_s = 0.0
 
     def channels(self):
         return list(self._channels)
@@ -23,8 +26,26 @@ class ChannelManager(QObject):
                 return channel
         return None
 
-    def update_values(self, values):
+    def sample_interval_s(self):
+        return self._sample_interval_s
+
+    def latest_sample_index(self):
+        return max(0, self._sample_index - 1)
+
+    def latest_sample_timestamp_s(self):
+        return self._latest_sample_timestamp_s
+
+    def reset_samples(self):
+        self._sample_index = 0
+        self._latest_sample_timestamp_s = 0.0
+
+    def update_values(self, values, sample_interval_s=None):
         values = list(values or [])
+        if sample_interval_s is not None:
+            self._sample_interval_s = max(0.000000001, float(sample_interval_s))
+        frame_index = self._sample_index
+        self._sample_index += 1
+        self._latest_sample_timestamp_s = frame_index * self._sample_interval_s
         for index, raw_value in enumerate(values):
             key = f"CH{index}"
             channel = self.channel_by_key(key)

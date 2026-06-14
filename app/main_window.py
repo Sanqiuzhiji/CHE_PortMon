@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox
 
@@ -9,12 +8,10 @@ from services.channel_manager import ChannelManager
 from services.theme_service import ThemeService
 from ui.generated.main_window_ui import Ui_MainWindow
 from ui.pages.connection_page import ConnectionPage
-from ui.pages.function_page import FunctionPage
 from ui.pages.plot_page import PlotPage
 from ui.pages.protocol_editor_page import ProtocolEditorPage
 from ui.pages.settings_page import SettingsPage
 from utils.format_utils import text_to_bytes
-from utils.function_generator import generate_function_points
 
 
 class MainWindow(QMainWindow):
@@ -32,10 +29,6 @@ class MainWindow(QMainWindow):
         self.current_port = "-"
         self.current_baud = "-"
         self.connected = False
-        self.function_points = []
-        self.function_index = 0
-        self.function_send_timer = QTimer(self)
-        self.function_send_timer.timeout.connect(self._send_next_function_point)
         self.channel_manager = ChannelManager(self)
 
         self._create_pages()
@@ -52,11 +45,10 @@ class MainWindow(QMainWindow):
         self.plot_page = PlotPage(channel_manager=self.channel_manager)
         self.protocol_editor_page = ProtocolEditorPage()
         self.protocol_editor_controller = ProtocolEditorController(self.protocol_editor_page)
-        self.function_page = FunctionPage()
         self.settings_page = SettingsPage()
         self.uart_controller = self.connection_page.uart_controller
 
-        for page in (self.connection_page, self.plot_page, self.protocol_editor_page, self.function_page, self.settings_page):
+        for page in (self.connection_page, self.plot_page, self.protocol_editor_page, self.settings_page):
             self.ui.pageStack.addWidget(page)
 
     def _connect_signals(self):
@@ -64,8 +56,7 @@ class MainWindow(QMainWindow):
             (self.ui.connectionNavButton, 0),
             (self.ui.plotNavButton, 1),
             (self.ui.protocolEditorNavButton, 2),
-            (self.ui.functionNavButton, 3),
-            (self.ui.settingsNavButton, 4),
+            (self.ui.settingsNavButton, 3),
         ]
         self.nav_buttons = [button for button, _ in nav_pairs]
         for button, index in nav_pairs:
@@ -75,9 +66,6 @@ class MainWindow(QMainWindow):
         self.connection_page.uart_stats_changed.connect(self._update_counts)
         self.connection_page.uart_error.connect(self._show_error)
 
-        self.function_page.preview_requested.connect(self._preview_function)
-        self.function_page.send_requested.connect(self._start_function_send)
-        self.function_page.stop_requested.connect(self._stop_function_send)
         self.plot_page.command_generated.connect(self._send_plot_command)
 
         self.settings_page.save_requested.connect(self._save_settings)
@@ -131,8 +119,6 @@ class MainWindow(QMainWindow):
         self.current_port = port
         self.current_baud = baud
         self.connected = connected
-        if not connected:
-            self._stop_function_send()
         self._update_status()
 
     def _save_receive_data(self, path):
@@ -140,52 +126,6 @@ class MainWindow(QMainWindow):
             self.uart_controller.save_receive_data(path)
         except OSError as exc:
             self._show_error(f"保存接收数据失败: {exc}")
-
-    def _preview_function(self):
-        try:
-            params = self.function_page.get_parameters()
-            points = generate_function_points(
-                params["function_name"],
-                params["start"],
-                params["end"],
-                params["step"],
-                params["amplitude"],
-                params["frequency"],
-            )
-            self.function_points = points
-            self.function_page.plot_points(points)
-        except ValueError as exc:
-            self._show_error(str(exc))
-
-    def _start_function_send(self):
-        if not self.uart_controller.is_open():
-            self._show_error("请先打开串口")
-            return
-        if not self.function_points:
-            self._preview_function()
-        if not self.function_points:
-            return
-        self.function_index = 0
-        self.function_page.set_sending(True)
-        self.function_send_timer.start(self.function_page.period_ms())
-
-    def _send_next_function_point(self):
-        if self.function_index >= len(self.function_points):
-            self._stop_function_send()
-            return
-        _, y_value = self.function_points[self.function_index]
-        self._send_uart_payload(f"{y_value:.6f}\n")
-        self.function_index += 1
-
-    def _send_uart_payload(self, payload):
-        if not self.uart_controller.is_open():
-            self._show_error("请先打开串口")
-            return
-        if isinstance(payload, bytes):
-            data = payload
-        else:
-            data = text_to_bytes(str(payload))
-        self.uart_controller.send_bytes(data)
 
     def _send_plot_command(self, payload):
         if not self.uart_controller.is_open():
@@ -202,10 +142,6 @@ class MainWindow(QMainWindow):
         for _ in range(repeat_count):
             if not self.uart_controller.send_bytes(data):
                 break
-
-    def _stop_function_send(self):
-        self.function_send_timer.stop()
-        self.function_page.set_sending(False)
 
     def _update_counts(self, receive_count, send_count):
         self.ui.receiveCountLabel.setText(f"接收: {receive_count} B")

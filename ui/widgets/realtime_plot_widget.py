@@ -39,9 +39,9 @@ TRACER_STYLES = {
 }
 
 X_UNITS = {
-    "s": ("秒 (s)", 1.0),
+    "samples": ("采样点", None),
     "ms": ("毫秒 (ms)", 1000.0),
-    "us": ("微秒 (us)", 1000000.0),
+    "s": ("秒 (s)", 1.0),
 }
 
 WHEEL_SPEEDS = {
@@ -81,6 +81,14 @@ class PlotDataBuffer:
         if not self._frames:
             return 0.0
         return self._frames[-1][0]
+
+    def sample_index_at(self, timestamp_s):
+        index = 0
+        for frame_index, (timestamp, _values) in enumerate(self._frames):
+            if timestamp > timestamp_s:
+                break
+            index = frame_index
+        return index
 
     def total_frames(self):
         return len(self._frames)
@@ -175,6 +183,7 @@ class PlotDrawArea(QWidget):
         self._last_mouse_pos = QPoint()
         self.live_tail_ratio = 0.78
         self.live_tail_dragging = False
+        self.fixed_tracer_time_s = None
         self._fps_times = deque(maxlen=80)
         self._last_y_range = (-1.0, 1.0)
 
@@ -273,7 +282,7 @@ class PlotDrawArea(QWidget):
         else:
             self._paint_series(painter, plot_rect, visible_keys, start_s, end_s, y_min, y_max)
             self._paint_channel_label(painter, plot_rect, visible_keys)
-            self._paint_live_tail_cursor(painter, plot_rect)
+            self._paint_tracer(painter, plot_rect)
 
         self._paint_hover_crosshair(painter, plot_rect, start_s, end_s, y_min, y_max)
         self._paint_status(painter, plot_rect, visible_keys, start_s, end_s)
@@ -309,12 +318,11 @@ class PlotDrawArea(QWidget):
             painter.drawLine(int(plot_rect.left()), int(y), int(plot_rect.right()), int(y))
 
         painter.setPen(text_pen)
-        unit_scale = X_UNITS[self.plot_widget.x_unit()][1]
         for index in range(major_x + 1):
             ratio = index / major_x
             x = plot_rect.left() + plot_rect.width() * ratio
-            value = (start_s + (end_s - start_s) * ratio) * unit_scale
-            painter.drawText(int(x) - 30, int(plot_rect.bottom()) + 17, 60, 16, Qt.AlignCenter, _format_axis(value))
+            value = start_s + (end_s - start_s) * ratio
+            painter.drawText(int(x) - 30, int(plot_rect.bottom()) + 17, 60, 16, Qt.AlignCenter, self._format_x_label(value))
 
         for index in range(major_y + 1):
             ratio = index / major_y
@@ -362,17 +370,25 @@ class PlotDrawArea(QWidget):
         painter.drawText(plot_rect.adjusted(8, 6, -8, -8), Qt.AlignLeft | Qt.AlignTop, key)
         painter.restore()
 
-    def _paint_live_tail_cursor(self, painter, plot_rect):
-        if self.plot_widget.buffer.total_frames() == 0:
+    def _paint_tracer(self, painter, plot_rect):
+        if not self.plot_widget.tracer_visible() or self.plot_widget.buffer.total_frames() == 0:
             return
         painter.save()
-        x = self._live_tail_x(plot_rect)
+        if self.plot_widget.tracer_follow_latest() or self.fixed_tracer_time_s is None:
+            x = self._live_tail_x(plot_rect)
+            timestamp = self.plot_widget.buffer.latest_time()
+        else:
+            timestamp = self.fixed_tracer_time_s
+            start_s, end_s = self.current_view_range()
+            x = self._time_to_x(timestamp, plot_rect, start_s, end_s)
+            x = max(plot_rect.left(), min(plot_rect.right(), x))
         cursor_color = QColor("#c05cff")
         pen = QPen(cursor_color, 1.4, Qt.DashLine)
         painter.setPen(pen)
         painter.drawLine(int(x), int(plot_rect.top()), int(x), int(plot_rect.bottom()))
+        self._paint_tracer_marker(painter, x, plot_rect)
 
-        label = _format_time_label(self.plot_widget.buffer.latest_time(), self.plot_widget.x_unit())
+        label = self._format_x_label(timestamp)
         metrics = QFontMetrics(painter.font())
         label_width = metrics.horizontalAdvance(label) + 12
         label_rect = QRectF(x - label_width / 2, plot_rect.bottom() + 4, label_width, 20)
@@ -400,7 +416,7 @@ class PlotDrawArea(QWidget):
 
         hover_time = self._x_to_time(x)
         hover_value = self._y_to_value(y, plot_rect, y_min, y_max)
-        x_label = _format_hover_time_label(hover_time, self.plot_widget.x_unit())
+        x_label = self._format_x_label(hover_time, hover=True)
         y_label = f"{hover_value:.3f}"
         self._draw_axis_label(painter, x_label, x, plot_rect.bottom() + 5, color, horizontal=True, bounds=plot_rect)
         self._draw_axis_label(painter, y_label, plot_rect.left() - 6, y, color, horizontal=False, bounds=plot_rect)
@@ -510,6 +526,17 @@ class PlotDrawArea(QWidget):
         self.live_tail_ratio = max(0.1, min(0.95, ratio))
         self.update()
 
+    def fix_tracer_to_hover(self):
+        if self._hover_pos is not None:
+            self.fixed_tracer_time_s = self._x_to_time(self._hover_pos.x())
+        else:
+            self.fixed_tracer_time_s = self._x_to_time(self._plot_rect().center().x())
+        self.update()
+
+    def clear_tracer(self):
+        self.fixed_tracer_time_s = None
+        self.update()
+
     def _set_hover_pos(self, pos):
         plot_rect = self._plot_rect()
         if plot_rect.contains(pos):
@@ -559,6 +586,15 @@ class PlotDrawArea(QWidget):
             self._hover_channel = best_key
             self.update()
 
+    def _format_x_label(self, timestamp_s, hover=False):
+        unit = self.plot_widget.x_unit()
+        if unit == "samples":
+            return str(self.plot_widget.buffer.sample_index_at(timestamp_s))
+        if unit == "s":
+            return f"{timestamp_s:.3f}s"
+        value = timestamp_s * 1000.0
+        return f"{value:.3f}" if hover else f"{value:.0f}"
+
 
 class RealtimePlotWidget(QWidget):
     visible_channels_changed = pyqtSignal()
@@ -568,13 +604,14 @@ class RealtimePlotWidget(QWidget):
         self.setObjectName("RealtimePlotWidget")
         self.channel_manager = channel_manager
         self.buffer = PlotDataBuffer(max_points=10000)
-        self._started_at = None
         self._channels = {}
         self._visible_channels = set()
         self._visibility_configured = False
         self._auto_range = True
         self._draw_mode = "line"
         self._tracer_style = "cross_horizontal"
+        self._tracer_visible = True
+        self._tracer_follow_latest = True
         self._x_unit = "ms"
         self._wheel_speed = 0.20
         self._cursor_value_mode = "nearest"
@@ -628,6 +665,32 @@ class RealtimePlotWidget(QWidget):
         self.max_points_spin.setFixedWidth(104)
         toolbar.addWidget(self.max_points_spin)
 
+        toolbar.addWidget(QLabel("F0:", self.toolbar_frame))
+        self.f0_spin = QDoubleSpinBox(self.toolbar_frame)
+        self.f0_spin.setRange(0.0, 1000000.0)
+        self.f0_spin.setDecimals(2)
+        self.f0_spin.setSuffix(" Hz")
+        self.f0_spin.setEnabled(False)
+        self.f0_spin.setFixedWidth(100)
+        toolbar.addWidget(self.f0_spin)
+
+        self.image_button = QToolButton(self.toolbar_frame)
+        self.image_button.setText("图")
+        self.image_button.setToolTip("FFT 图像占位")
+        self.image_button.setEnabled(False)
+        toolbar.addWidget(self.image_button)
+
+        self.table_button = QToolButton(self.toolbar_frame)
+        self.table_button.setText("表")
+        self.table_button.setToolTip("FFT 表格占位")
+        self.table_button.setEnabled(False)
+        toolbar.addWidget(self.table_button)
+
+        self.eye_button = QToolButton(self.toolbar_frame)
+        self.eye_button.setText("眼")
+        self.eye_button.setToolTip("显示/隐藏工具栏")
+        toolbar.addWidget(self.eye_button)
+
         self.auto_range_button = QToolButton(self.toolbar_frame)
         self.auto_range_button.setText("自动范围")
         self.auto_range_button.setCheckable(True)
@@ -640,7 +703,7 @@ class RealtimePlotWidget(QWidget):
         toolbar.addWidget(self.demo_button)
 
         self.hide_toolbar_button = QToolButton(self.toolbar_frame)
-        self.hide_toolbar_button.setText("隐藏工具栏")
+        self.hide_toolbar_button.setText("更多")
         toolbar.addWidget(self.hide_toolbar_button)
         toolbar.addStretch(1)
 
@@ -659,11 +722,20 @@ class RealtimePlotWidget(QWidget):
         self.time_spin.valueChanged.connect(lambda value: self.set_time_window_s(value))
         self.max_points_spin.valueChanged.connect(self._set_max_points)
         self.auto_range_button.toggled.connect(self.set_auto_range)
-        self.hide_toolbar_button.clicked.connect(lambda: self.set_toolbar_visible(False))
+        self.hide_toolbar_button.clicked.connect(self._show_more_menu)
+        self.eye_button.clicked.connect(lambda: self.set_toolbar_visible(False))
+        self.channel_combo.activated.connect(self._handle_channel_combo_activated)
         self.demo_button.toggled.connect(self._set_demo_enabled)
         self.demo_timer.timeout.connect(self._append_demo_frame)
         self.repaint_timer.timeout.connect(self._update_if_dirty)
         self.draw_area.context_menu_requested.connect(self.show_context_menu)
+
+    def contextMenuEvent(self, event):
+        self.show_context_menu(event.globalPos())
+        event.accept()
+
+    def _show_more_menu(self):
+        self.show_context_menu(self.hide_toolbar_button.mapToGlobal(QPoint(0, self.hide_toolbar_button.height())))
 
     def _handle_channels_changed(self, channels):
         channels = list(channels or [])
@@ -675,9 +747,11 @@ class RealtimePlotWidget(QWidget):
             if channel.enabled:
                 values[channel.key] = channel.display_value
         if values:
-            if self._started_at is None:
-                self._started_at = time.perf_counter()
-            self.buffer.append(time.perf_counter() - self._started_at, values)
+            if self.channel_manager is not None and hasattr(self.channel_manager, "latest_sample_timestamp_s"):
+                timestamp_s = self.channel_manager.latest_sample_timestamp_s()
+            else:
+                timestamp_s = self.buffer.total_frames()
+            self.buffer.append(timestamp_s, values)
         self._refresh_channel_summary()
         self._paint_dirty = True
 
@@ -699,7 +773,10 @@ class RealtimePlotWidget(QWidget):
         square = 1.0 if square_phase < 0.5 else -1.0
         saw = 2.0 * saw_phase - 1.0
         sine = math.sin(2.0 * math.pi * 0.32 * t) + 0.35 * math.sin(2.0 * math.pi * 0.91 * t)
-        self.channel_manager.update_values([triangle, square + 1.5, saw + 3.0, sine + 5.0])
+        self.channel_manager.update_values(
+            [triangle, square + 1.5, saw + 3.0, sine + 5.0],
+            sample_interval_s=self.demo_timer.interval() / 1000.0,
+        )
 
     def _set_demo_enabled(self, enabled):
         if enabled:
@@ -782,6 +859,12 @@ class RealtimePlotWidget(QWidget):
     def tracer_style(self):
         return self._tracer_style
 
+    def tracer_visible(self):
+        return self._tracer_visible
+
+    def tracer_follow_latest(self):
+        return self._tracer_follow_latest
+
     def x_unit(self):
         return self._x_unit
 
@@ -793,7 +876,6 @@ class RealtimePlotWidget(QWidget):
 
     def clear_data(self):
         self.buffer.clear()
-        self._started_at = None
         self.draw_area.reset_view_to_latest()
         self.draw_area.update()
 
@@ -805,6 +887,9 @@ class RealtimePlotWidget(QWidget):
             "max_points": self.buffer.max_points(),
             "draw_mode": self._draw_mode,
             "tracer_style": self._tracer_style,
+            "tracer_visible": self._tracer_visible,
+            "tracer_follow_latest": self._tracer_follow_latest,
+            "tracer_time_s": self.draw_area.fixed_tracer_time_s,
             "x_unit": self._x_unit,
             "wheel_speed": self._wheel_speed,
             "cursor_value_mode": self._cursor_value_mode,
@@ -830,6 +915,10 @@ class RealtimePlotWidget(QWidget):
             if config.get("tracer_style", "cross_horizontal") in TRACER_STYLES
             else "cross_horizontal"
         )
+        self._tracer_visible = bool(config.get("tracer_visible", True))
+        self._tracer_follow_latest = bool(config.get("tracer_follow_latest", True))
+        tracer_time = config.get("tracer_time_s")
+        self.draw_area.fixed_tracer_time_s = float(tracer_time) if tracer_time is not None else None
         self._x_unit = config.get("x_unit", "ms") if config.get("x_unit", "ms") in X_UNITS else "ms"
         self._wheel_speed = float(config.get("wheel_speed", 0.20))
         if self._wheel_speed not in WHEEL_SPEEDS:
@@ -866,9 +955,9 @@ class RealtimePlotWidget(QWidget):
         auto_action.setCheckable(True)
         auto_action.setChecked(self._auto_range)
         save_action = menu.addAction("保存数据")
+        clear_action = menu.addAction("清空数据")
         toolbar_action = menu.addAction("隐藏工具栏" if self.toolbar_visible() else "显示工具栏")
         copy_action = menu.addAction("复制截图")
-        copy_all_action = menu.addAction("复制所有截图")
         menu.addSeparator()
 
         draw_menu = menu.addMenu("绘图模式")
@@ -876,6 +965,13 @@ class RealtimePlotWidget(QWidget):
         draw_actions = self._add_exclusive_actions(draw_menu, DRAW_MODES, self._draw_mode)
         tracer_menu = menu.addMenu("Tracer标记")
         tracer_menu.setObjectName("plotContextMenu")
+        tracer_visible_action = tracer_menu.addAction("显示 Tracer" if not self._tracer_visible else "隐藏 Tracer")
+        tracer_follow_action = tracer_menu.addAction("跟随最新数据")
+        tracer_follow_action.setCheckable(True)
+        tracer_follow_action.setChecked(self._tracer_follow_latest)
+        tracer_fixed_action = tracer_menu.addAction("固定到当前鼠标位置")
+        tracer_clear_action = tracer_menu.addAction("清除 Tracer")
+        tracer_menu.addSeparator()
         tracer_actions = self._add_exclusive_actions(tracer_menu, TRACER_STYLES, self._tracer_style)
         unit_menu = menu.addMenu("X轴单位")
         unit_menu.setObjectName("plotContextMenu")
@@ -898,15 +994,29 @@ class RealtimePlotWidget(QWidget):
             self.set_auto_range(auto_action.isChecked())
         elif action == save_action:
             self.save_data()
+        elif action == clear_action:
+            self.clear_data()
         elif action == toolbar_action:
             self.set_toolbar_visible(not self.toolbar_visible())
         elif action == copy_action:
             self.copy_screenshot(all_widgets=False)
-        elif action == copy_all_action:
-            self.copy_screenshot(all_widgets=True)
         elif action in draw_actions:
             self._draw_mode = draw_actions[action]
             self.draw_area.update()
+        elif action == tracer_visible_action:
+            self._tracer_visible = not self._tracer_visible
+            self.draw_area.update()
+        elif action == tracer_follow_action:
+            self._tracer_follow_latest = tracer_follow_action.isChecked()
+            self._tracer_visible = True
+            self.draw_area.update()
+        elif action == tracer_fixed_action:
+            self._tracer_follow_latest = False
+            self._tracer_visible = True
+            self.draw_area.fix_tracer_to_hover()
+        elif action == tracer_clear_action:
+            self._tracer_visible = False
+            self.draw_area.clear_tracer()
         elif action in tracer_actions:
             self._tracer_style = tracer_actions[action]
             self.draw_area.update()
@@ -958,8 +1068,23 @@ class RealtimePlotWidget(QWidget):
         text = ",".join(visible) if visible else "无通道"
         self.channel_combo.blockSignals(True)
         self.channel_combo.clear()
-        self.channel_combo.addItem(text)
+        self.channel_combo.addItem(text, None)
+        self.channel_combo.addItem("显示全部", "__all__")
+        self.channel_combo.addItem("隐藏全部", "__none__")
+        for key in sorted(self._channels.keys(), key=_channel_sort_key):
+            marker = "✓ " if self.is_channel_visible(key) else "  "
+            self.channel_combo.addItem(f"{marker}{key}", key)
         self.channel_combo.blockSignals(False)
+
+    def _handle_channel_combo_activated(self, index):
+        value = self.channel_combo.itemData(index)
+        if value == "__all__":
+            self.set_all_channels_visible(True)
+        elif value == "__none__":
+            self.set_all_channels_visible(False)
+        elif value:
+            self.toggle_channel_visible(value)
+        self._refresh_channel_summary()
 
     def _export_channel_keys(self):
         keys = set(self._channels.keys())
@@ -980,22 +1105,6 @@ def _format_csv_value(value):
     if value is None:
         return ""
     return f"{float(value):.9g}"
-
-
-def _format_time_label(timestamp_s, unit):
-    if unit == "s":
-        return f"{timestamp_s:.3f}s"
-    if unit == "us":
-        return f"{timestamp_s * 1000000.0:.0f}us"
-    return f"{timestamp_s * 1000.0:.0f}"
-
-
-def _format_hover_time_label(timestamp_s, unit):
-    if unit == "s":
-        return f"{timestamp_s:.3f}s"
-    if unit == "us":
-        return f"{timestamp_s * 1000000.0:.0f}us"
-    return f"{timestamp_s * 1000.0:.3f}"
 
 
 def _linear_value(points, cursor_s):

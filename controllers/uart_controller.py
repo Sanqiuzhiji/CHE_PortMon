@@ -91,4 +91,7 @@ class UartController(QObject):
         if hasattr(self.widget, "current_data_format") and self.widget.current_data_format() == "JustFloat":
             for frame_values in self.just_float_parser.feed(raw):
                 if self.channel_manager is not None:
-                    self.channel_manager.update_values(frame_values)
+                    sample_interval_s = None
+                    if hasattr(self.widget, "plot_period_s"):
+                        sample_interval_s = self.widget.plot_period_s()
+                    self.channel_manager.update_values(frame_values, sample_interval_s=sample_interval_s)
