@@ -22,6 +22,7 @@ from services.plot_layout_service import PlotLayoutService
 from ui.widgets.detachable_page_tab_widget import DetachablePageTabWidget
 from ui.widgets.plot_widgets import PlotCanvas
 
+
 class PlotWorkspacePage(QWidget):
     def __init__(self, channel_manager=None, name="Page 1", parent=None):
         super().__init__(parent)
@@ -58,6 +59,7 @@ class PlotPage(QWidget):
         self._page_count = 0
         self._build_ui()
         self._connect_signals()
+        self._load_or_create_layout()
         self._sync_empty_state()
 
     def _build_ui(self):
@@ -136,7 +138,12 @@ class PlotPage(QWidget):
         self.snap_to_grid_check.toggled.connect(self._handle_snap_to_grid_changed)
 
     def _load_or_create_layout(self):
-        self._sync_empty_state()
+        try:
+            layout = self.layout_service.load_all_pages()
+        except (OSError, ValueError):
+            layout = {"pages": []}
+        if isinstance(layout, dict) and layout.get("pages"):
+            self._load_layout_data(layout)
 
     def _handle_current_changed(self, *_args):
         current = self.current_page_widget()
@@ -150,7 +157,8 @@ class PlotPage(QWidget):
         page.canvas.command_generated.connect(self.command_generated.emit)
         page.canvas.set_grid_size(self.grid_size_spinbox.value())
         page.canvas.set_snap_to_grid(self.snap_to_grid_check.isChecked())
-        self.page_tabs.add_page(page_name, page_name, page)
+        index = self.page_tabs.add_page(page_name, page_name, page)
+        self.page_tabs.setCurrentIndex(index)
         self._sync_empty_state()
         return page
 
@@ -373,21 +381,24 @@ class PlotChannelPanel(QFrame):
         self._current_key = None
 
     def _rebuild(self, channels):
-        while self.rows_container.count():
-            item = self.rows_container.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.deleteLater()
-        self._rows.clear()
+        active_keys = {channel.key for channel in channels}
+        for key, row in list(self._rows.items()):
+            if key in active_keys:
+                continue
+            self._rows.pop(key, None)
+            self.rows_container.removeWidget(row)
+            row.deleteLater()
         for channel in channels:
-            row = PlotChannelRow(channel, self)
-            row.clicked.connect(self._select_channel)
+            row = self._rows.get(channel.key)
+            if row is None:
+                row = PlotChannelRow(channel, self)
+                row.clicked.connect(self._select_channel)
+                self.rows_container.addWidget(row)
+                self._rows[channel.key] = row
             row.update_channel(channel)
-            self.rows_container.addWidget(row)
-            self._rows[channel.key] = row
-        if channels:
-            if self._current_key not in self._rows:
-                self._current_key = channels[0].key
+        if channels and self._current_key not in self._rows:
+            self._current_key = channels[0].key
+        if self._current_key in self._rows:
             self._update_editor()
 
     def _select_channel(self, key):

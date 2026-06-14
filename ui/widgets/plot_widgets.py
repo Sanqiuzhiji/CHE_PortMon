@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass
 
 from PyQt5.QtCore import QPoint, QPointF, QSize, Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QColor, QPainter, QPen, QBrush
+from PyQt5.QtGui import QColor, QPainter, QPen, QBrush, QPixmap
 from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -27,6 +27,14 @@ from PyQt5.QtWidgets import (
 )
 
 from models.channel_model import DEFAULT_CHANNEL_COLORS
+from ui.widgets.realtime_plot_widget import (
+    CURSOR_VALUE_MODES,
+    DRAW_MODES,
+    TRACER_STYLES,
+    WHEEL_SPEEDS,
+    X_UNITS,
+    RealtimePlotWidget,
+)
 
 
 @dataclass
@@ -533,6 +541,87 @@ class ModePlotControl(BasePlotControl):
         self._rebuild_buttons()
 
 
+class _GaugeDialWidget(QWidget):
+    def __init__(self, owner, parent=None):
+        super().__init__(parent)
+        self.owner = owner
+        self._dial_cache = None
+        self._dial_cache_size = QSize()
+        self.setMinimumHeight(110)
+
+    def invalidate_cache(self):
+        self._dial_cache = None
+        self._dial_cache_size = QSize()
+        self.update()
+
+    def resizeEvent(self, event):
+        self.invalidate_cache()
+        super().resizeEvent(event)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        rect = self._dial_rect()
+        if not rect.isValid():
+            return
+        self._paint_cached_dial(painter, rect)
+        ratio = 0 if self.owner._max_value == self.owner._min_value else (
+            self.owner._current_value - self.owner._min_value
+        ) / (self.owner._max_value - self.owner._min_value)
+        ratio = max(0.0, min(1.0, ratio))
+        painter.setPen(QPen(QColor("#2d8cff"), 8, Qt.SolidLine, Qt.RoundCap))
+        painter.drawArc(rect, 210 * 16, int(-240 * 16 * ratio))
+        self._paint_needle(painter, rect, ratio)
+
+    def _dial_rect(self):
+        rect = self.rect().adjusted(12, 6, -12, -6)
+        size = min(rect.width(), rect.height())
+        if size <= 12:
+            return rect
+        x = rect.center().x() - size / 2
+        y = rect.center().y() - size / 2
+        from PyQt5.QtCore import QRectF
+
+        return QRectF(x, y, size, size)
+
+    def _paint_cached_dial(self, painter, rect):
+        size = rect.size().toSize()
+        if self._dial_cache is None or self._dial_cache_size != size:
+            self._dial_cache_size = size
+            self._dial_cache = QPixmap(size)
+            self._dial_cache.fill(Qt.transparent)
+            cache_painter = QPainter(self._dial_cache)
+            cache_painter.setRenderHint(QPainter.Antialiasing)
+            local_rect = self._dial_cache.rect().adjusted(4, 4, -4, -4)
+            cache_painter.setPen(QPen(QColor("#455468"), 8, Qt.SolidLine, Qt.RoundCap))
+            cache_painter.drawArc(local_rect, 210 * 16, -240 * 16)
+            cache_painter.setPen(QPen(QColor("#778395"), 1))
+            center = local_rect.center()
+            radius = min(local_rect.width(), local_rect.height()) / 2
+            for index in range(0, 11):
+                ratio = index / 10.0
+                angle = math.radians(210 - 240 * ratio)
+                outer = QPointF(center.x() + math.cos(angle) * (radius - 4), center.y() - math.sin(angle) * (radius - 4))
+                inner_len = 14 if index % 5 == 0 else 9
+                inner = QPointF(center.x() + math.cos(angle) * (radius - inner_len), center.y() - math.sin(angle) * (radius - inner_len))
+                cache_painter.drawLine(inner, outer)
+            cache_painter.end()
+        painter.drawPixmap(rect.topLeft(), self._dial_cache)
+
+    def _paint_needle(self, painter, rect, ratio):
+        center = rect.center()
+        radius = min(rect.width(), rect.height()) / 2
+        angle = math.radians(210 - 240 * ratio)
+        tip = QPointF(center.x() + math.cos(angle) * (radius - 20), center.y() - math.sin(angle) * (radius - 20))
+        tail = QPointF(center.x() - math.cos(angle) * 12, center.y() + math.sin(angle) * 12)
+        painter.setPen(QPen(QColor("#ffb020"), 3, Qt.SolidLine, Qt.RoundCap))
+        painter.drawLine(tail, tip)
+        painter.setBrush(QColor("#ffb020"))
+        painter.setPen(QPen(QColor("#202020"), 1))
+        painter.drawEllipse(center, 5, 5)
+
+
 class GaugePlotControl(BasePlotControl):
     def __init__(self, channel_manager=None, control_id=None, parent=None):
         super().__init__("Gauge", control_id=control_id, parent=parent)
@@ -546,6 +635,8 @@ class GaugePlotControl(BasePlotControl):
         self._precision = 1
         self._unit = ""
         self._current_value = 0.0
+        self.dial_widget = _GaugeDialWidget(self, self.body)
+        self.body_layout.addWidget(self.dial_widget, 1)
         self.value_label = QLabel("CH0: 0.0", self.body)
         self.value_label.setAlignment(Qt.AlignCenter)
         self.body_layout.addWidget(self.value_label)
@@ -573,19 +664,15 @@ class GaugePlotControl(BasePlotControl):
     def _refresh_view(self):
         label = self._custom_name if self._use_custom_name else self._channel_key
         self.value_label.setText(f"{label}: {self._current_value:.{self._precision}f}{self._unit}")
-        self.update()
+        self.dial_widget.update()
+
+    def resizeEvent(self, event):
+        if hasattr(self, "dial_widget"):
+            self.dial_widget.invalidate_cache()
+        super().resizeEvent(event)
 
     def paintEvent(self, event):
         super().paintEvent(event)
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        rect = self.rect().adjusted(18, 34, -18, -18)
-        painter.setPen(QPen(QColor("#455468"), 8))
-        painter.drawArc(rect, 210 * 16, -240 * 16)
-        ratio = 0 if self._max_value == self._min_value else (self._current_value - self._min_value) / (self._max_value - self._min_value)
-        ratio = max(0.0, min(1.0, ratio))
-        painter.setPen(QPen(QColor("#2d8cff"), 8))
-        painter.drawArc(rect, 210 * 16, int(-240 * 16 * ratio))
 
     def control_config(self):
         return {
@@ -606,7 +693,52 @@ class GaugePlotControl(BasePlotControl):
         self._max_value = float(config.get("max_value", self._max_value))
         self._precision = int(config.get("precision", self._precision))
         self._unit = config.get("unit", self._unit)
+        self.dial_widget.invalidate_cache()
         self._refresh_view()
+
+
+class RealtimeWavePlotControl(BasePlotControl):
+    def __init__(self, channel_manager=None, control_id=None, parent=None):
+        super().__init__("Realtime Plot", control_id=control_id, parent=parent)
+        self.control_type = "realtime_plot"
+        self.channel_manager = channel_manager
+        self.plot_widget = RealtimePlotWidget(channel_manager=channel_manager, parent=self.body)
+        self.body_layout.addWidget(self.plot_widget)
+        self._apply_default_size()
+
+    def _apply_default_size(self):
+        self.resize(760, 420)
+
+    def control_config(self):
+        config = self.plot_widget.to_dict()
+        config["title"] = self.title
+        return config
+
+    def apply_config(self, config):
+        config = config or {}
+        self.title = config.get("title", self.title)
+        self.header.setText(self.title)
+        self.plot_widget.apply_config(config)
+
+    def mousePressEvent(self, event):
+        if self.body.geometry().contains(event.pos()) and event.button() == Qt.LeftButton:
+            if hasattr(self.parentWidget(), "select_control"):
+                self.parentWidget().select_control(self)
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self.body.geometry().contains(event.pos()) and event.buttons() & Qt.LeftButton:
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if self.body.geometry().contains(event.pos()) and event.button() == Qt.LeftButton:
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
 
 
 CONTROL_TYPES = {
@@ -614,6 +746,7 @@ CONTROL_TYPES = {
     "slider": SliderPlotControl,
     "mode": ModePlotControl,
     "gauge": GaugePlotControl,
+    "realtime_plot": RealtimeWavePlotControl,
 }
 
 
@@ -621,7 +754,7 @@ def create_plot_control(control_type, channel_manager=None, control_id=None, par
     control_cls = CONTROL_TYPES.get(control_type)
     if control_cls is None:
         raise ValueError(f"Unknown plot control type: {control_type}")
-    if control_type == "gauge":
+    if control_type in ("gauge", "realtime_plot"):
         return control_cls(channel_manager=channel_manager, control_id=control_id, parent=parent)
     return control_cls(control_id=control_id, parent=parent)
 
@@ -756,7 +889,6 @@ class PlotCanvas(QWidget):
     def _show_context_menu(self, global_pos):
         menu = QMenu(self)
         add_plot = menu.addAction("Add Plot Control")
-        add_plot.setEnabled(False)
         add_slider = menu.addAction("Add Slider Control")
         add_toggle = menu.addAction("Add Toggle Control")
         add_mode = menu.addAction("Add Mode Control")
@@ -767,7 +899,9 @@ class PlotCanvas(QWidget):
         if action is None:
             return
         local_pos = self.mapFromGlobal(global_pos)
-        if action == add_slider:
+        if action == add_plot:
+            self.add_control("realtime_plot", local_pos)
+        elif action == add_slider:
             self.add_control("slider", local_pos)
         elif action == add_toggle:
             self.add_control("toggle", local_pos)
@@ -785,6 +919,8 @@ class PlotCanvas(QWidget):
             dialog = _ModeConfigDialog(control, self)
         elif isinstance(control, GaugePlotControl):
             dialog = _GaugeConfigDialog(control, self)
+        elif isinstance(control, RealtimeWavePlotControl):
+            dialog = _RealtimePlotConfigDialog(control, self)
         else:
             return
         if dialog.exec_() == QDialog.Accepted:
@@ -1011,5 +1147,89 @@ class _GaugeConfigDialog(_BaseConfigDialog):
             "max_value": self.max_spin.value(),
             "precision": self.precision_spin.value(),
             "unit": self.unit_edit.text(),
+        }
+        super().accept()
+
+
+class _RealtimePlotConfigDialog(_BaseConfigDialog):
+    def __init__(self, control, parent=None):
+        super().__init__(control, parent)
+        self.setWindowTitle("Realtime Plot Config")
+        self.resize(420, 360)
+        config = control.control_config()
+
+        self.title_edit = QLineEdit(config.get("title", "Realtime Plot"), self)
+        self.visible_edit = QLineEdit(",".join(config.get("visible_channels", [])), self)
+
+        self.time_spin = QDoubleSpinBox(self)
+        self.time_spin.setRange(0.1, 120.0)
+        self.time_spin.setSingleStep(0.5)
+        self.time_spin.setDecimals(1)
+        self.time_spin.setSuffix(" s")
+        self.time_spin.setValue(float(config.get("time_window_s", 10.0)))
+
+        self.max_points_spin = QSpinBox(self)
+        self.max_points_spin.setRange(100, 200000)
+        self.max_points_spin.setSingleStep(1000)
+        self.max_points_spin.setValue(int(config.get("max_points", 10000)))
+
+        self.live_tail_spin = QDoubleSpinBox(self)
+        self.live_tail_spin.setRange(0.1, 0.95)
+        self.live_tail_spin.setSingleStep(0.01)
+        self.live_tail_spin.setDecimals(2)
+        self.live_tail_spin.setValue(float(config.get("live_tail_ratio", 0.78)))
+
+        self.auto_range_check = QCheckBox(self)
+        self.auto_range_check.setChecked(bool(config.get("auto_range", True)))
+        self.toolbar_check = QCheckBox(self)
+        self.toolbar_check.setChecked(bool(config.get("toolbar_visible", True)))
+
+        self.draw_combo = self._combo_from_dict(DRAW_MODES, config.get("draw_mode", "line"))
+        self.tracer_combo = self._combo_from_dict(TRACER_STYLES, config.get("tracer_style", "cross_horizontal"))
+        self.unit_combo = self._combo_from_dict({key: label for key, (label, _scale) in X_UNITS.items()}, config.get("x_unit", "ms"))
+        self.speed_combo = self._combo_from_dict(WHEEL_SPEEDS, float(config.get("wheel_speed", 0.20)))
+        self.cursor_combo = self._combo_from_dict(CURSOR_VALUE_MODES, config.get("cursor_value_mode", "nearest"))
+
+        self.form.addRow("Title", self.title_edit)
+        self.form.addRow("Visible CH", self.visible_edit)
+        self.form.addRow("Time Window", self.time_spin)
+        self.form.addRow("Max Points", self.max_points_spin)
+        self.form.addRow("Live Tail", self.live_tail_spin)
+        self.form.addRow("Auto Range", self.auto_range_check)
+        self.form.addRow("Toolbar", self.toolbar_check)
+        self.form.addRow("Draw Mode", self.draw_combo)
+        self.form.addRow("Tracer", self.tracer_combo)
+        self.form.addRow("X Unit", self.unit_combo)
+        self.form.addRow("Wheel Speed", self.speed_combo)
+        self.form.addRow("Cursor Value", self.cursor_combo)
+
+    def _combo_from_dict(self, choices, current):
+        combo = QComboBox(self)
+        for value, label in choices.items():
+            combo.addItem(label, value)
+        index = combo.findData(current)
+        if index >= 0:
+            combo.setCurrentIndex(index)
+        return combo
+
+    def accept(self):
+        visible = [
+            item.strip()
+            for item in self.visible_edit.text().split(",")
+            if item.strip()
+        ]
+        self._result = {
+            "title": self.title_edit.text().strip() or "Realtime Plot",
+            "visible_channels": visible,
+            "auto_range": self.auto_range_check.isChecked(),
+            "time_window_s": self.time_spin.value(),
+            "max_points": self.max_points_spin.value(),
+            "live_tail_ratio": self.live_tail_spin.value(),
+            "draw_mode": self.draw_combo.currentData(),
+            "tracer_style": self.tracer_combo.currentData(),
+            "x_unit": self.unit_combo.currentData(),
+            "wheel_speed": self.speed_combo.currentData(),
+            "cursor_value_mode": self.cursor_combo.currentData(),
+            "toolbar_visible": self.toolbar_check.isChecked(),
         }
         super().accept()

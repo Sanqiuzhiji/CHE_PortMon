@@ -599,10 +599,61 @@ QLabel#plotTitleLabel {
 
 QFrame#plotToolbarFrame,
 QWidget#plotCanvas,
-QWidget#plotChannelPanel {
+QWidget#plotChannelPanel,
+QWidget#RealtimePlotWidget {
     background: #252525;
     border: 1px solid #404040;
     border-radius: 6px;
+}
+
+QFrame#plotRealtimeToolbarFrame {
+    background: #292929;
+    border: 1px solid #3f3f3f;
+    border-radius: 6px;
+}
+
+QFrame#plotRealtimeToolbarFrame QLabel {
+    background: transparent;
+    color: #b9c0ca;
+}
+
+QFrame#plotRealtimeToolbarFrame QToolButton,
+QFrame#plotRealtimeToolbarFrame QComboBox,
+QFrame#plotRealtimeToolbarFrame QSpinBox,
+QFrame#plotRealtimeToolbarFrame QDoubleSpinBox {
+    min-height: 20px;
+    padding: 2px 7px;
+}
+
+QWidget#PlotDrawArea {
+    background: #242424;
+    border: 1px solid #454545;
+    border-radius: 6px;
+}
+
+QMenu#plotContextMenu {
+    background: #2a2a2a;
+    border: 1px solid #555555;
+    border-radius: 6px;
+    color: #eeeeee;
+    padding: 5px;
+}
+
+QMenu#plotContextMenu::item {
+    background: transparent;
+    color: #eeeeee;
+    padding: 5px 28px 5px 24px;
+}
+
+QMenu#plotContextMenu::item:selected {
+    background: #26384d;
+    color: #ffffff;
+}
+
+QMenu#plotContextMenu::separator {
+    background: #454545;
+    height: 1px;
+    margin: 5px 4px;
 }
 
 QTabWidget#plotPageTabs {
@@ -643,8 +694,14 @@ QWidget#plotChannelRow {
     border-radius: 5px;
 }
 
-QWidget#plotChannelRow:disabled {
-    color: #727272;
+QWidget#plotChannelRow[hidden="true"] {
+    background: #252525;
+    border-color: #333333;
+}
+
+QFrame#plotChannelConfigFrame {
+    background: transparent;
+    border: 0;
 }
 
 QWidget#plotControl {

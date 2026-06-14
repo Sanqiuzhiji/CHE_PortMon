@@ -67,9 +67,6 @@ class PlotLayoutService:
             if not isinstance(page_data, dict):
                 continue
 
-            if "controls" not in page_data:
-                continue
-
             if "name" not in page_data:
                 page_data["name"] = path.stem
 

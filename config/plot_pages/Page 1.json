@@ -1,0 +1,51 @@
+{
+  "name": "Page 1",
+  "grid_size": 20,
+  "snap_to_grid": true,
+  "controls": [
+    {
+      "id": "d1c9667a898d4e02aa562b356d303e71",
+      "type": "realtime_plot",
+      "x": 0,
+      "y": 40,
+      "w": 820,
+      "h": 500,
+      "config": {
+        "visible_channels": [
+          "CH0",
+          "CH1",
+          "CH2",
+          "CH3",
+          "CH4"
+        ],
+        "auto_range": false,
+        "time_window_s": 12.9,
+        "max_points": 7000,
+        "draw_mode": "line",
+        "tracer_style": "cross_horizontal",
+        "x_unit": "ms",
+        "wheel_speed": 0.2,
+        "cursor_value_mode": "nearest",
+        "toolbar_visible": true,
+        "title": "Realtime Plot"
+      }
+    },
+    {
+      "id": "d526a0a7099a42c6846c5b403a0859bd",
+      "type": "gauge",
+      "x": 960,
+      "y": 260,
+      "w": 200,
+      "h": 180,
+      "config": {
+        "channel_key": "CH0",
+        "use_custom_name": false,
+        "custom_name": "Gauge",
+        "min_value": -100.0,
+        "max_value": 100.0,
+        "precision": 1,
+        "unit": ""
+      }
+    }
+  ]
+}
