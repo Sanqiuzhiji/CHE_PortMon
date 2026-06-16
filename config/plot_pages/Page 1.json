@@ -1,0 +1,37 @@
+{
+  "name": "Page 1",
+  "grid_size": 20,
+  "snap_to_grid": true,
+  "controls": [
+    {
+      "id": "a49ffadceff1418cb8f2b417f8f3dd87",
+      "type": "plot",
+      "x": 40,
+      "y": 40,
+      "w": 760,
+      "h": 420,
+      "config": {
+        "visible_channels": [
+          "CH0",
+          "CH1",
+          "CH2",
+          "CH3"
+        ],
+        "auto_range": true,
+        "time_window_s": 5.0,
+        "max_points": 6000,
+        "draw_mode": "line",
+        "tracer_style": "cross_horizontal",
+        "tracer_visible": true,
+        "tracer_follow_latest": true,
+        "tracer_time_s": null,
+        "x_unit": "ms",
+        "wheel_speed": 0.2,
+        "cursor_value_mode": "nearest",
+        "toolbar_visible": true,
+        "live_tail_ratio": 0.78,
+        "title": "Realtime Plot"
+      }
+    }
+  ]
+}

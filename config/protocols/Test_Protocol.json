@@ -1,0 +1,49 @@
+{
+  "name": "Test_Protocol",
+  "code_mode": "简洁模式",
+  "byte_order": "小端",
+  "checksum": "crc16-xmodem",
+  "frames": [
+    {
+      "name": "Test_Protocol",
+      "fields": [
+        {
+          "id": "3eb1fbf71610414397c69866d42e087c",
+          "label": "header",
+          "kind": "Header",
+          "data_type": "hex",
+          "length": 1,
+          "start": 0,
+          "end": 0,
+          "default_value": "0x41",
+          "color": "#4cc9f0",
+          "include_in_checksum": false
+        },
+        {
+          "id": "c5b09e6ee1924b6c8b7726f47a87c0fd",
+          "label": "data1",
+          "kind": "Data",
+          "data_type": "string",
+          "length": 6,
+          "start": 1,
+          "end": 6,
+          "default_value": "",
+          "color": "#80ed99",
+          "include_in_checksum": false
+        },
+        {
+          "id": "6f6aef78407b4062b8b98d1d2d659c6d",
+          "label": "tail",
+          "kind": "Tail",
+          "data_type": "hex",
+          "length": 1,
+          "start": 7,
+          "end": 7,
+          "default_value": "0x42",
+          "color": "#f72585",
+          "include_in_checksum": false
+        }
+      ]
+    }
+  ]
+}

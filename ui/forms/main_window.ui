@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>1360</width><height>860</height></rect>
+  </property>
+  <property name="windowTitle"><string>CHE Port Monitor</string></property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QHBoxLayout" name="rootLayout">
+    <property name="spacing"><number>0</number></property>
+    <property name="leftMargin"><number>0</number></property>
+    <property name="topMargin"><number>0</number></property>
+    <property name="rightMargin"><number>0</number></property>
+    <property name="bottomMargin"><number>0</number></property>
+    <item>
+     <widget class="QFrame" name="sidebarFrame">
+      <property name="minimumSize"><size><width>196</width><height>0</height></size></property>
+      <property name="maximumSize"><size><width>196</width><height>16777215</height></size></property>
+      <layout class="QVBoxLayout" name="sidebarLayout">
+       <property name="spacing"><number>2</number></property>
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>16</number></property>
+       <item><widget class="QLabel" name="appTitleLabel"><property name="text"><string>CHE PortMon</string></property></widget></item>
+       <item><widget class="QPushButton" name="connectionNavButton"><property name="text"><string>Connection</string></property></widget></item>
+       <item><widget class="QPushButton" name="plotNavButton"><property name="text"><string>Plot</string></property></widget></item>
+       <item><widget class="QPushButton" name="protocolEditorNavButton"><property name="text"><string>Protocol Editor</string></property></widget></item>
+       <item><widget class="QPushButton" name="settingsNavButton"><property name="text"><string>设置</string></property></widget></item>
+       <item><spacer name="sidebarSpacer"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint"><size><width>20</width><height>40</height></size></property></spacer></item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QWidget" name="contentWidget">
+      <layout class="QVBoxLayout" name="contentLayout">
+       <property name="spacing"><number>0</number></property>
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item>
+        <widget class="QFrame" name="topStatusFrame">
+         <property name="minimumSize"><size><width>0</width><height>52</height></size></property>
+         <property name="maximumSize"><size><width>16777215</width><height>52</height></size></property>
+         <layout class="QHBoxLayout" name="statusLayout">
+          <property name="leftMargin"><number>20</number></property>
+          <property name="rightMargin"><number>20</number></property>
+          <item><widget class="QLabel" name="portStatusLabel"><property name="text"><string>串口: -</string></property></widget></item>
+          <item><widget class="QLabel" name="baudStatusLabel"><property name="text"><string>波特率: -</string></property></widget></item>
+          <item><widget class="QLabel" name="connectionStatusLabel"><property name="text"><string>状态: 未连接</string></property></widget></item>
+          <item><widget class="QLabel" name="receiveCountLabel"><property name="text"><string>接收: 0 B</string></property></widget></item>
+          <item><widget class="QLabel" name="sendCountLabel"><property name="text"><string>发送: 0 B</string></property></widget></item>
+          <item><spacer name="statusSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint"><size><width>40</width><height>20</height></size></property></spacer></item>
+         </layout>
+        </widget>
+       </item>
+       <item><widget class="QStackedWidget" name="pageStack"/></item>
+      </layout>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
