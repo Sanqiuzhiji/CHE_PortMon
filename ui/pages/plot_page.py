@@ -2,6 +2,7 @@
 import re
 
 from PyQt5.QtCore import QPoint, Qt, pyqtSignal
+from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (
     QCheckBox,
     QFileDialog,
@@ -351,6 +352,7 @@ class PlotChannelPanel(QFrame):
         self.channel_manager = channel_manager
         self._rows = {}
         self._current_key = None
+        self._editor_dirty = False
         self.setMinimumWidth(260)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
@@ -363,13 +365,16 @@ class PlotChannelPanel(QFrame):
         layout.addLayout(self.rows_container)
         layout.addStretch(1)
         self.config_frame = QFrame(self)
+        self.config_frame.setObjectName("plotChannelConfigFrame")
         config_layout = QVBoxLayout(self.config_frame)
-        config_layout.setContentsMargins(0, 0, 0, 0)
+        config_layout.setContentsMargins(8, 8, 8, 8)
         self.name_edit = QLineEdit(self.config_frame)
         self.color_edit = QLineEdit(self.config_frame)
         self.gain_edit = QLineEdit(self.config_frame)
         self.offset_edit = QLineEdit(self.config_frame)
         self.apply_button = QPushButton("Apply", self.config_frame)
+        for editor in (self.name_edit, self.color_edit, self.gain_edit, self.offset_edit):
+            editor.textEdited.connect(self._mark_editor_dirty)
         form = QFormLayout()
         form.addRow("Name", self.name_edit)
         form.addRow("Color", self.color_edit)
@@ -404,11 +409,12 @@ class PlotChannelPanel(QFrame):
             row.update_channel(channel)
         if channels and self._current_key not in self._rows:
             self._current_key = channels[0].key
-        if self._current_key in self._rows:
+        if self._current_key in self._rows and not self._editor_is_busy():
             self._update_editor()
 
     def _select_channel(self, key):
         self._current_key = key
+        self._editor_dirty = False
         self._update_editor()
 
     def _update_editor(self):
@@ -417,18 +423,55 @@ class PlotChannelPanel(QFrame):
         channel = self.channel_manager.channel_by_key(self._current_key)
         if channel is None:
             return
+        self._editor_dirty = False
         self.name_edit.setText(channel.name)
         self.color_edit.setText(channel.color)
         self.gain_edit.setText(f"{channel.gain:.4f}")
         self.offset_edit.setText(f"{channel.offset:.4f}")
+        self._apply_editor_color(channel.color)
 
     def _apply_config(self):
         if self.channel_manager is None or self._current_key is None:
             return
+        name = self.name_edit.text().strip() or self._current_key
+        color = self.color_edit.text().strip() or None
+        gain = float(self.gain_edit.text() or "1.0")
+        offset = float(self.offset_edit.text() or "0.0")
         self.channel_manager.update_channel_config(
             self._current_key,
-            name=self.name_edit.text().strip() or self._current_key,
-            color=self.color_edit.text().strip() or None,
-            gain=float(self.gain_edit.text() or "1.0"),
-            offset=float(self.offset_edit.text() or "0.0"),
+            name=name,
+            color=color,
+            gain=gain,
+            offset=offset,
+        )
+        self._editor_dirty = False
+        self._apply_editor_color(color)
+
+    def _mark_editor_dirty(self, *_args):
+        self._editor_dirty = True
+        if self.sender() is self.color_edit:
+            self._apply_editor_color(self.color_edit.text().strip())
+
+    def _editor_is_busy(self):
+        has_focus = any(
+            widget.hasFocus()
+            for widget in (self.name_edit, self.color_edit, self.gain_edit, self.offset_edit)
+        )
+        return self._editor_dirty or has_focus
+
+    def _apply_editor_color(self, color_text):
+        if not color_text:
+            self.config_frame.setStyleSheet("")
+            return
+        color = QColor(color_text)
+        if not color.isValid():
+            self.config_frame.setStyleSheet("")
+            return
+        r, g, b = color.red(), color.green(), color.blue()
+        self.config_frame.setStyleSheet(
+            "QFrame#plotChannelConfigFrame {"
+            f"background: rgba({r}, {g}, {b}, 42);"
+            f"border: 1px solid rgba({r}, {g}, {b}, 170);"
+            "border-radius: 6px;"
+            "}"
         )

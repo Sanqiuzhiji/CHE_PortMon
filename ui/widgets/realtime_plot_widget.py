@@ -183,6 +183,14 @@ class PlotDrawArea(QWidget):
         self._last_mouse_pos = QPoint()
         self.live_tail_ratio = 0.78
         self.live_tail_dragging = False
+        self._plot_panning = False
+        self._pan_start_pos = QPoint()
+        self._pan_start_live_tail_ratio = self.live_tail_ratio
+        self._pan_start_y_range = self._last_y_range if hasattr(self, "_last_y_range") else (-1.0, 1.0)
+        self._latest_frame_label_rect = QRectF()
+        self.tracer_ratios = []
+        self._selected_tracer_index = None
+        self._tracer_dragging = False
         self.fixed_tracer_time_s = None
         self._fps_times = deque(maxlen=80)
         self._last_y_range = (-1.0, 1.0)
@@ -203,26 +211,41 @@ class PlotDrawArea(QWidget):
 
     def wheelEvent(self, event):
         plot_rect = self._plot_rect()
-        if event.pos().x() < plot_rect.left():
+        if event.pos().x() < plot_rect.left() and plot_rect.top() <= event.pos().y() <= plot_rect.bottom():
             self._zoom_y_axis(event.pos(), event.angleDelta().y() > 0)
             event.accept()
             return
-
-        old_start, old_end = self.current_view_range()
-        old_span = max(0.1, old_end - old_start)
-        speed = self.plot_widget.wheel_speed()
-        zoom_in = event.angleDelta().y() > 0
-        new_span = old_span * (1.0 - speed if zoom_in else 1.0 + speed)
-        new_span = max(0.1, min(120.0, new_span))
-        self.plot_widget.set_time_window_s(new_span, reset_view=False)
-        self.update()
+        self._zoom_x_axis(event.angleDelta().y() > 0)
         event.accept()
 
     def mousePressEvent(self, event):
         self._last_mouse_pos = event.pos()
+        if event.button() == Qt.LeftButton:
+            tracer_index = self._tracer_hit_index(event.pos())
+            if tracer_index is not None:
+                self._selected_tracer_index = tracer_index
+                self._tracer_dragging = True
+                self.setFocus(Qt.MouseFocusReason)
+                self.update()
+                event.accept()
+                return
         if event.button() == Qt.LeftButton and self._is_near_live_tail(event.pos()):
             self.live_tail_dragging = True
             self._set_live_tail_from_x(event.pos().x())
+            event.accept()
+            return
+        if event.button() == Qt.LeftButton and self._plot_rect().contains(event.pos()):
+            channel_key = self._channel_at_pos(event.pos(), tolerance=8.0)
+            if channel_key:
+                self.plot_widget.set_highlight_channel(channel_key)
+                event.accept()
+                return
+        if event.button() == Qt.LeftButton and self._plot_rect().contains(event.pos()):
+            self._plot_panning = True
+            self._pan_start_pos = event.pos()
+            self._pan_start_live_tail_ratio = self.live_tail_ratio
+            self._pan_start_y_range = self._current_y_range()
+            self.setFocus(Qt.MouseFocusReason)
             event.accept()
             return
         if event.button() in (Qt.LeftButton, Qt.MiddleButton):
@@ -233,24 +256,42 @@ class PlotDrawArea(QWidget):
 
     def mouseMoveEvent(self, event):
         self._set_hover_pos(event.pos())
+        if self._tracer_dragging:
+            self._move_selected_tracer(event.pos().x())
+            event.accept()
+            return
         if self.live_tail_dragging:
             self._set_live_tail_from_x(event.pos().x())
             event.accept()
             return
-        self.setCursor(Qt.SizeHorCursor if self._is_near_live_tail(event.pos()) else Qt.ArrowCursor)
+        if self._plot_panning:
+            self._pan_plot_to(event.pos())
+            event.accept()
+            return
+        near_tracer = self._tracer_hit_index(event.pos()) is not None
+        self.setCursor(Qt.SizeHorCursor if near_tracer or self._is_near_live_tail(event.pos()) else Qt.ArrowCursor)
         self._update_hover_channel(event.pos())
         event.accept()
 
     def mouseReleaseEvent(self, event):
+        self._tracer_dragging = False
         self.live_tail_dragging = False
+        self._plot_panning = False
         if event.button() in (Qt.LeftButton, Qt.MiddleButton):
             event.accept()
             return
         super().mouseReleaseEvent(event)
 
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.LeftButton and self._plot_rect().contains(event.pos()):
+            self.add_tracer_at_x(event.pos().x())
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
+
     def leaveEvent(self, event):
         self._hover_pos = None
-        if not self.live_tail_dragging:
+        if not self.live_tail_dragging and not self._plot_panning:
             self.setCursor(Qt.ArrowCursor)
         self.update()
         super().leaveEvent(event)
@@ -282,7 +323,8 @@ class PlotDrawArea(QWidget):
         else:
             self._paint_series(painter, plot_rect, visible_keys, start_s, end_s, y_min, y_max)
             self._paint_channel_label(painter, plot_rect, visible_keys)
-            self._paint_tracer(painter, plot_rect)
+            self._paint_latest_frame_line(painter, plot_rect, start_s, end_s)
+            self._paint_tracer(painter, plot_rect, visible_keys, start_s, end_s, y_min, y_max)
 
         self._paint_hover_crosshair(painter, plot_rect, start_s, end_s, y_min, y_max)
         self._paint_status(painter, plot_rect, visible_keys, start_s, end_s)
@@ -336,19 +378,24 @@ class PlotDrawArea(QWidget):
         painter.save()
         painter.setClipRect(plot_rect.adjusted(1, 1, -1, -1))
         draw_mode = self.plot_widget.draw_mode()
-        for key in visible_keys:
+        highlight_key = self.plot_widget.highlight_channel()
+        draw_keys = [key for key in visible_keys if key != highlight_key]
+        if highlight_key in visible_keys:
+            draw_keys.append(highlight_key)
+        for key in draw_keys:
             points = self.plot_widget.buffer.series(key, start_s, end_s)
             if not points:
                 continue
             decimate_limit = max(20000, plot_rect.width() * 12) if draw_mode in ("line", "line_points") else max(200, plot_rect.width() * 2)
             points = _decimate_points(points, int(decimate_limit))
             color = QColor(self.plot_widget.channel_color(key))
+            highlighted = key == highlight_key
             mapped = [self._map_point(timestamp, value, plot_rect, start_s, end_s, y_min, y_max) for timestamp, value in points]
             if draw_mode in ("line", "line_points") and len(mapped) >= 2:
                 path = QPainterPath(mapped[0])
                 for point in mapped[1:]:
                     path.lineTo(point)
-                pen = QPen(color, 1.6)
+                pen = QPen(color, 3.2 if highlighted else 1.6)
                 pen.setCapStyle(Qt.RoundCap)
                 pen.setJoinStyle(Qt.RoundJoin)
                 painter.setPen(pen)
@@ -356,7 +403,7 @@ class PlotDrawArea(QWidget):
             if draw_mode in ("points", "line_points"):
                 painter.setPen(Qt.NoPen)
                 painter.setBrush(color)
-                radius = 2.2 if draw_mode == "points" else 1.8
+                radius = 3.2 if highlighted else (2.2 if draw_mode == "points" else 1.8)
                 for point in mapped:
                     painter.drawEllipse(point, radius, radius)
         painter.restore()
@@ -370,25 +417,43 @@ class PlotDrawArea(QWidget):
         painter.drawText(plot_rect.adjusted(8, 6, -8, -8), Qt.AlignLeft | Qt.AlignTop, key)
         painter.restore()
 
-    def _paint_tracer(self, painter, plot_rect):
+    def _paint_tracer(self, painter, plot_rect, visible_keys, start_s, end_s, y_min, y_max):
         if not self.plot_widget.tracer_visible() or self.plot_widget.buffer.total_frames() == 0:
             return
+        if not self.tracer_ratios:
+            return
         painter.save()
-        if self.plot_widget.tracer_follow_latest() or self.fixed_tracer_time_s is None:
-            x = self._live_tail_x(plot_rect)
-            timestamp = self.plot_widget.buffer.latest_time()
-        else:
-            timestamp = self.fixed_tracer_time_s
-            start_s, end_s = self.current_view_range()
-            x = self._time_to_x(timestamp, plot_rect, start_s, end_s)
-            x = max(plot_rect.left(), min(plot_rect.right(), x))
-        cursor_color = QColor("#c05cff")
-        pen = QPen(cursor_color, 1.4, Qt.DashLine)
-        painter.setPen(pen)
-        painter.drawLine(int(x), int(plot_rect.top()), int(x), int(plot_rect.bottom()))
-        self._paint_tracer_marker(painter, x, plot_rect)
+        tracer_positions = []
+        for index, ratio in enumerate(self.tracer_ratios[:2]):
+            x = self._ratio_to_x(ratio, plot_rect)
+            if x < plot_rect.left() or x > plot_rect.right():
+                continue
+            timestamp = self._ratio_to_time(ratio, start_s, end_s)
+            tracer_positions.append((timestamp, x))
+            pen = QPen(QColor("#ffffff"), 1.4, Qt.DashLine)
+            if index == self._selected_tracer_index:
+                pen.setWidthF(2.0)
+            painter.setPen(pen)
+            painter.drawLine(int(x), int(plot_rect.top()), int(x), int(plot_rect.bottom()))
+            intersections = self._tracer_intersections(timestamp, visible_keys, start_s, end_s, plot_rect, y_min, y_max)
+            self._paint_tracer_intersections(painter, x, intersections, plot_rect)
+            self._paint_tracer_time_label(painter, timestamp, x, plot_rect)
 
-        label = self._format_x_label(timestamp)
+        if len(tracer_positions) == 2:
+            self._paint_tracer_delta(painter, tracer_positions[0], tracer_positions[1], plot_rect)
+        painter.restore()
+
+    def _paint_latest_frame_line(self, painter, plot_rect, start_s, end_s):
+        latest = self.plot_widget.buffer.latest_time()
+        x = self._time_to_x(latest, plot_rect, start_s, end_s)
+        if x < plot_rect.left() or x > plot_rect.right():
+            self._latest_frame_label_rect = QRectF()
+            return
+        painter.save()
+        color = QColor("#a855f7")
+        painter.setPen(QPen(color, 1.8, Qt.SolidLine))
+        painter.drawLine(int(x), int(plot_rect.top()), int(x), int(plot_rect.bottom()))
+        label = self._format_x_label(latest, hover=True)
         metrics = QFontMetrics(painter.font())
         label_width = metrics.horizontalAdvance(label) + 12
         label_rect = QRectF(x - label_width / 2, plot_rect.bottom() + 4, label_width, 20)
@@ -396,10 +461,11 @@ class PlotDrawArea(QWidget):
             label_rect.moveLeft(plot_rect.left())
         if label_rect.right() > plot_rect.right():
             label_rect.moveRight(plot_rect.right())
+        self._latest_frame_label_rect = QRectF(label_rect)
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor("#3a254d"))
+        painter.setBrush(QColor(42, 28, 58, 230))
         painter.drawRoundedRect(label_rect, 4, 4)
-        painter.setPen(cursor_color)
+        painter.setPen(color)
         painter.drawText(label_rect, Qt.AlignCenter, label)
         painter.restore()
 
@@ -443,10 +509,15 @@ class PlotDrawArea(QWidget):
         painter.setPen(color)
         painter.drawText(rect, Qt.AlignCenter, text)
 
-    def _paint_tracer_marker(self, painter, x, plot_rect):
+    def _paint_tracer_intersections(self, painter, x, intersections, plot_rect):
+        for index, item in enumerate(intersections):
+            key, value, y, color = item
+            self._paint_tracer_marker(painter, x, y, color)
+            self._paint_tracer_value_label(painter, key, value, x, y, color, plot_rect, index)
+
+    def _paint_tracer_marker(self, painter, x, y, color):
         style = self.plot_widget.tracer_style()
-        y = plot_rect.center().y()
-        painter.setPen(QPen(QColor("#c05cff"), 1.5))
+        painter.setPen(QPen(color, 1.5))
         painter.setBrush(Qt.NoBrush)
         if style == "circle_slash":
             painter.drawEllipse(QRectF(x - 6, y - 6, 12, 12))
@@ -463,7 +534,89 @@ class PlotDrawArea(QWidget):
         else:
             painter.drawLine(int(x - 7), int(y), int(x + 7), int(y))
             painter.drawLine(int(x), int(y - 7), int(x), int(y + 7))
-            painter.drawLine(int(plot_rect.left()), int(y), int(plot_rect.right()), int(y))
+
+    def _paint_tracer_value_label(self, painter, key, value, x, y, color, plot_rect, index):
+        style = self.plot_widget.tracer_style()
+        label = f"{key}: {value:.3f}"
+        metrics = QFontMetrics(painter.font())
+        width = metrics.horizontalAdvance(label) + 12
+        height = 20
+        vertical_offset = 0
+        if style == "cross_horizontal":
+            on_right = x + 12 + width <= plot_rect.right()
+            label_x = x + 14 if on_right else x - width - 14
+            label_y = max(plot_rect.top(), min(plot_rect.bottom() - height, y - height / 2 + vertical_offset))
+            line_end = label_x if on_right else label_x + width
+            painter.setPen(QPen(color, 1.0))
+            painter.drawLine(int(x), int(y), int(line_end), int(label_y + height / 2))
+        else:
+            on_right = x + 24 + width <= plot_rect.right()
+            label_x = x + 24 if on_right else x - width - 24
+            label_y = y - 28 + vertical_offset
+            if label_y < plot_rect.top():
+                label_y = y + 12 + vertical_offset
+            label_y = max(plot_rect.top(), min(plot_rect.bottom() - height, label_y))
+            line_end_x = label_x if on_right else label_x + width
+            line_end_y = label_y + height / 2
+            painter.setPen(QPen(color, 1.0))
+            painter.drawLine(int(x), int(y), int(line_end_x), int(line_end_y))
+
+        label_rect = QRectF(label_x, label_y, width, height)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(36, 36, 36, 220))
+        painter.drawRoundedRect(label_rect, 4, 4)
+        painter.setPen(color)
+        painter.drawText(label_rect, Qt.AlignCenter, label)
+
+    def _paint_tracer_time_label(self, painter, timestamp, x, plot_rect):
+        label = self._format_x_label(timestamp)
+        metrics = QFontMetrics(painter.font())
+        label_width = metrics.horizontalAdvance(label) + 12
+        label_rect = QRectF(x - label_width / 2, plot_rect.bottom() + 4, label_width, 20)
+        if label_rect.left() < plot_rect.left():
+            label_rect.moveLeft(plot_rect.left())
+        if label_rect.right() > plot_rect.right():
+            label_rect.moveRight(plot_rect.right())
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor("#333333"))
+        painter.drawRoundedRect(label_rect, 4, 4)
+        painter.setPen(QColor("#ffffff"))
+        painter.drawText(label_rect, Qt.AlignCenter, label)
+
+    def _paint_tracer_delta(self, painter, left_tracer, right_tracer, plot_rect):
+        left_time, left_x = left_tracer
+        right_time, right_x = right_tracer
+        if left_x > right_x:
+            left_time, right_time = right_time, left_time
+            left_x, right_x = right_x, left_x
+        y = plot_rect.top() + plot_rect.height() * 0.95
+        color = QColor("#f6c343")
+        painter.setPen(QPen(color, 1.8, Qt.SolidLine))
+        painter.drawLine(int(left_x), int(y), int(right_x), int(y))
+        self._paint_arrow_head(painter, left_x, y, toward_right=False, color=color)
+        self._paint_arrow_head(painter, right_x, y, toward_right=True, color=color)
+
+        dt_s = abs(right_time - left_time)
+        frequency = 1.0 / dt_s if dt_s > 0 else 0.0
+        label = f"dt = {dt_s * 1000.0:.3f} ms({frequency:.3f} Hz)"
+        metrics = QFontMetrics(painter.font())
+        width = metrics.horizontalAdvance(label) + 14
+        label_rect = QRectF((left_x + right_x) / 2 - width / 2, y - 26, width, 20)
+        if label_rect.left() < plot_rect.left():
+            label_rect.moveLeft(plot_rect.left())
+        if label_rect.right() > plot_rect.right():
+            label_rect.moveRight(plot_rect.right())
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(44, 38, 18, 225))
+        painter.drawRoundedRect(label_rect, 4, 4)
+        painter.setPen(color)
+        painter.drawText(label_rect, Qt.AlignCenter, label)
+
+    def _paint_arrow_head(self, painter, x, y, toward_right, color):
+        direction = 1 if toward_right else -1
+        painter.setPen(QPen(color, 1.8, Qt.SolidLine))
+        painter.drawLine(int(x), int(y), int(x - direction * 8), int(y - 5))
+        painter.drawLine(int(x), int(y), int(x - direction * 8), int(y + 5))
 
     def _paint_status(self, painter, plot_rect, visible_keys, start_s, end_s):
         painter.save()
@@ -497,6 +650,20 @@ class PlotDrawArea(QWidget):
         ratio = max(0.0, min(1.0, ratio))
         return start_s + (end_s - start_s) * ratio
 
+    def _x_to_ratio(self, x):
+        plot_rect = self._plot_rect()
+        if plot_rect.width() <= 0:
+            return 0.0
+        ratio = (x - plot_rect.left()) / plot_rect.width()
+        return max(0.0, min(1.0, ratio))
+
+    def _ratio_to_x(self, ratio, plot_rect):
+        return plot_rect.left() + max(0.0, min(1.0, float(ratio))) * plot_rect.width()
+
+    def _ratio_to_time(self, ratio, start_s, end_s):
+        ratio = max(0.0, min(1.0, float(ratio)))
+        return start_s + (end_s - start_s) * ratio
+
     def _value_to_y(self, value, plot_rect, y_min, y_max):
         span = max(0.000001, y_max - y_min)
         return plot_rect.bottom() - (value - y_min) / span * plot_rect.height()
@@ -510,9 +677,65 @@ class PlotDrawArea(QWidget):
     def _live_tail_x(self, plot_rect):
         return plot_rect.left() + plot_rect.width() * self.live_tail_ratio
 
+    def _tracer_hit_index(self, pos):
+        if not self.plot_widget.tracer_visible() or not self.tracer_ratios:
+            return None
+        plot_rect = self._plot_rect()
+        if not plot_rect.adjusted(-8, 0, 8, 0).contains(pos):
+            return None
+        best_index = None
+        best_distance = 8.0
+        for index, ratio in enumerate(self.tracer_ratios[:2]):
+            x = self._ratio_to_x(ratio, plot_rect)
+            if x < plot_rect.left() - 8 or x > plot_rect.right() + 8:
+                continue
+            distance = abs(pos.x() - x)
+            if distance <= best_distance:
+                best_index = index
+                best_distance = distance
+        return best_index
+
+    def add_tracer_at_x(self, x):
+        if len(self.tracer_ratios) >= 2:
+            self.clear_tracer()
+            return
+        ratio = self._x_to_ratio(x)
+        self.tracer_ratios.append(ratio)
+        self.fixed_tracer_time_s = self._x_to_time(x)
+        self._selected_tracer_index = len(self.tracer_ratios) - 1
+        self.plot_widget._tracer_visible = True
+        self.plot_widget._tracer_follow_latest = False
+        self.update()
+
+    def _move_selected_tracer(self, x):
+        if self._selected_tracer_index is None:
+            return
+        if self._selected_tracer_index < 0 or self._selected_tracer_index >= len(self.tracer_ratios):
+            return
+        self.tracer_ratios[self._selected_tracer_index] = self._x_to_ratio(x)
+        self.fixed_tracer_time_s = self._x_to_time(x)
+        self.update()
+
+    def _tracer_intersections(self, timestamp, visible_keys, start_s, end_s, plot_rect, y_min, y_max):
+        intersections = []
+        for key in visible_keys:
+            points = self.plot_widget.buffer.series(key, start_s, end_s)
+            if not points:
+                continue
+            if self.plot_widget.cursor_value_mode() == "linear":
+                value = _linear_value(points, timestamp)
+            else:
+                value = min(points, key=lambda item: abs(item[0] - timestamp))[1]
+            y = self._value_to_y(value, plot_rect, y_min, y_max)
+            if plot_rect.top() <= y <= plot_rect.bottom():
+                intersections.append((key, value, y, QColor(self.plot_widget.channel_color(key))))
+        return intersections
+
     def _is_near_live_tail(self, pos):
         if self.plot_widget.buffer.total_frames() == 0:
             return False
+        if not self._latest_frame_label_rect.isNull() and self._latest_frame_label_rect.contains(pos):
+            return True
         plot_rect = self._plot_rect()
         if not plot_rect.adjusted(-8, -8, 8, 8).contains(pos):
             return False
@@ -523,18 +746,39 @@ class PlotDrawArea(QWidget):
         if plot_rect.width() <= 1:
             return
         ratio = (x - plot_rect.left()) / plot_rect.width()
-        self.live_tail_ratio = max(0.1, min(0.95, ratio))
+        self.live_tail_ratio = max(0.05, min(0.95, ratio))
         self.update()
+
+    def _pan_plot_to(self, pos):
+        plot_rect = self._plot_rect()
+        if plot_rect.width() <= 1:
+            return
+        delta_ratio = (pos.x() - self._pan_start_pos.x()) / plot_rect.width()
+        self.live_tail_ratio = max(0.05, min(0.95, self._pan_start_live_tail_ratio + delta_ratio))
+        y_min, y_max = self._pan_start_y_range
+        span = max(0.000001, y_max - y_min)
+        delta_value = (pos.y() - self._pan_start_pos.y()) / max(1.0, plot_rect.height()) * span
+        self._last_y_range = (y_min + delta_value, y_max + delta_value)
+        self.plot_widget.set_auto_range(False)
+        self.update()
+
+    def _current_y_range(self):
+        start_s, end_s = self.current_view_range()
+        visible_keys = self.plot_widget.visible_channel_keys()
+        if self.plot_widget.auto_range():
+            return self.plot_widget.buffer.y_range(visible_keys, start_s, end_s)
+        return self._last_y_range
 
     def fix_tracer_to_hover(self):
-        if self._hover_pos is not None:
-            self.fixed_tracer_time_s = self._x_to_time(self._hover_pos.x())
-        else:
-            self.fixed_tracer_time_s = self._x_to_time(self._plot_rect().center().x())
-        self.update()
+        x = self._hover_pos.x() if self._hover_pos is not None else self._plot_rect().center().x()
+        self.add_tracer_at_x(x)
 
     def clear_tracer(self):
+        self.tracer_ratios = []
+        self._selected_tracer_index = None
+        self._tracer_dragging = False
         self.fixed_tracer_time_s = None
+        self.plot_widget._tracer_visible = False
         self.update()
 
     def _set_hover_pos(self, pos):
@@ -564,27 +808,49 @@ class PlotDrawArea(QWidget):
         self.plot_widget.set_auto_range(False)
         self.update()
 
+    def _zoom_x_axis(self, zoom_in):
+        old_start, old_end = self.current_view_range()
+        old_span = max(0.001, old_end - old_start)
+        speed = self.plot_widget.wheel_speed()
+        new_span = old_span * (1.0 - speed if zoom_in else 1.0 + speed)
+        new_span = max(0.001, min(120.0, new_span))
+        self.plot_widget.set_time_window_s(new_span, reset_view=False)
+        self.update()
+
     def _update_hover_channel(self, pos):
+        best_key = self._channel_at_pos(pos, tolerance=8.0)
+        if best_key != self._hover_channel:
+            self._hover_channel = best_key
+            self.update()
+
+    def _channel_at_pos(self, pos, tolerance=8.0):
         start_s, end_s = self.current_view_range()
         plot_rect = self._plot_rect()
+        if not plot_rect.contains(pos):
+            return None
         y_min, y_max = self._last_y_range
         best_key = None
-        best_distance = 10.0
-        mouse_t = self._x_to_time(pos.x())
+        best_distance = float(tolerance)
         for key in self.plot_widget.visible_channel_keys():
             points = self.plot_widget.buffer.series(key, start_s, end_s)
             if not points:
                 continue
-            timestamp, value = min(points, key=lambda item: abs(item[0] - mouse_t))
-            x = self._time_to_x(timestamp, plot_rect, start_s, end_s)
-            y = self._value_to_y(value, plot_rect, y_min, y_max)
-            distance = math.hypot(pos.x() - x, pos.y() - y)
+            mapped = [
+                self._map_point(timestamp, value, plot_rect, start_s, end_s, y_min, y_max)
+                for timestamp, value in points
+            ]
+            if len(mapped) == 1:
+                point = mapped[0]
+                distance = math.hypot(pos.x() - point.x(), pos.y() - point.y())
+            else:
+                distance = min(
+                    _distance_to_segment(pos, mapped[index - 1], mapped[index])
+                    for index in range(1, len(mapped))
+                )
             if distance < best_distance:
                 best_key = key
                 best_distance = distance
-        if best_key != self._hover_channel:
-            self._hover_channel = best_key
-            self.update()
+        return best_key
 
     def _format_x_label(self, timestamp_s, hover=False):
         unit = self.plot_widget.x_unit()
@@ -610,11 +876,14 @@ class RealtimePlotWidget(QWidget):
         self._auto_range = True
         self._draw_mode = "line"
         self._tracer_style = "cross_horizontal"
-        self._tracer_visible = True
-        self._tracer_follow_latest = True
+        self._tracer_visible = False
+        self._tracer_follow_latest = False
         self._x_unit = "ms"
         self._wheel_speed = 0.20
         self._cursor_value_mode = "nearest"
+        self._highlight_channel = None
+        self._channel_combo_signature = None
+        self._time_window_s = 10.0
         self._demo_phase = 0.0
         self._paint_dirty = False
         self._build_ui()
@@ -649,12 +918,12 @@ class RealtimePlotWidget(QWidget):
 
         toolbar.addWidget(QLabel("T:", self.toolbar_frame))
         self.time_spin = QDoubleSpinBox(self.toolbar_frame)
-        self.time_spin.setRange(0.1, 120.0)
-        self.time_spin.setSingleStep(0.5)
-        self.time_spin.setDecimals(1)
+        self.time_spin.setRange(0.001, 120.0)
+        self.time_spin.setSingleStep(0.1)
+        self.time_spin.setDecimals(6)
         self.time_spin.setSuffix(" s")
         self.time_spin.setValue(10.0)
-        self.time_spin.setFixedWidth(86)
+        self.time_spin.setFixedWidth(116)
         toolbar.addWidget(self.time_spin)
 
         toolbar.addWidget(QLabel("N:", self.toolbar_frame))
@@ -740,10 +1009,14 @@ class RealtimePlotWidget(QWidget):
     def _handle_channels_changed(self, channels):
         channels = list(channels or [])
         values = {}
+        summary_changed = False
+        old_signature = self._channel_summary_signature()
         for channel in channels:
             self._channels[channel.key] = channel
             if not self._visibility_configured and channel.enabled:
-                self._visible_channels.add(channel.key)
+                if channel.key not in self._visible_channels:
+                    summary_changed = True
+                    self._visible_channels.add(channel.key)
             if channel.enabled:
                 values[channel.key] = channel.display_value
         if values:
@@ -752,7 +1025,9 @@ class RealtimePlotWidget(QWidget):
             else:
                 timestamp_s = self.buffer.total_frames()
             self.buffer.append(timestamp_s, values)
-        self._refresh_channel_summary()
+        summary_changed = summary_changed or old_signature != self._channel_summary_signature()
+        if summary_changed:
+            self._refresh_channel_summary()
         self._paint_dirty = True
 
     def _update_if_dirty(self):
@@ -789,7 +1064,8 @@ class RealtimePlotWidget(QWidget):
         self.draw_area.update()
 
     def set_time_window_s(self, value, reset_view=True):
-        value = max(0.1, min(120.0, float(value)))
+        value = max(0.001, min(120.0, float(value)))
+        self._time_window_s = value
         self.time_spin.blockSignals(True)
         self.time_spin.setValue(value)
         self.time_spin.blockSignals(False)
@@ -798,7 +1074,7 @@ class RealtimePlotWidget(QWidget):
         self.draw_area.update()
 
     def time_window_s(self):
-        return float(self.time_spin.value())
+        return float(self._time_window_s)
 
     def set_auto_range(self, enabled):
         self._auto_range = bool(enabled)
@@ -829,6 +1105,8 @@ class RealtimePlotWidget(QWidget):
             self._visible_channels.add(key)
         else:
             self._visible_channels.discard(key)
+            if self._highlight_channel == key:
+                self._highlight_channel = None
         self._refresh_channel_summary()
         self.visible_channels_changed.emit()
         self.draw_area.update()
@@ -839,6 +1117,7 @@ class RealtimePlotWidget(QWidget):
             self._visible_channels = set(self._channels.keys())
         else:
             self._visible_channels.clear()
+            self._highlight_channel = None
         self._refresh_channel_summary()
         self.visible_channels_changed.emit()
         self.draw_area.update()
@@ -855,6 +1134,17 @@ class RealtimePlotWidget(QWidget):
 
     def draw_mode(self):
         return self._draw_mode
+
+    def highlight_channel(self):
+        return self._highlight_channel
+
+    def set_highlight_channel(self, key):
+        if key is not None and key not in self.visible_channel_keys():
+            key = None
+        if self._highlight_channel == key:
+            return
+        self._highlight_channel = key
+        self.draw_area.update()
 
     def tracer_style(self):
         return self._tracer_style
@@ -880,6 +1170,11 @@ class RealtimePlotWidget(QWidget):
         self.draw_area.update()
 
     def to_dict(self):
+        start_s, end_s = self.draw_area.current_view_range()
+        tracer_times = [
+            self.draw_area._ratio_to_time(ratio, start_s, end_s)
+            for ratio in self.draw_area.tracer_ratios[:2]
+        ]
         return {
             "visible_channels": self.visible_channel_keys(),
             "auto_range": self._auto_range,
@@ -889,7 +1184,9 @@ class RealtimePlotWidget(QWidget):
             "tracer_style": self._tracer_style,
             "tracer_visible": self._tracer_visible,
             "tracer_follow_latest": self._tracer_follow_latest,
-            "tracer_time_s": self.draw_area.fixed_tracer_time_s,
+            "tracer_time_s": tracer_times[0] if tracer_times else None,
+            "tracer_times": tracer_times,
+            "tracer_ratios": list(self.draw_area.tracer_ratios[:2]),
             "x_unit": self._x_unit,
             "wheel_speed": self._wheel_speed,
             "cursor_value_mode": self._cursor_value_mode,
@@ -915,10 +1212,34 @@ class RealtimePlotWidget(QWidget):
             if config.get("tracer_style", "cross_horizontal") in TRACER_STYLES
             else "cross_horizontal"
         )
-        self._tracer_visible = bool(config.get("tracer_visible", True))
-        self._tracer_follow_latest = bool(config.get("tracer_follow_latest", True))
-        tracer_time = config.get("tracer_time_s")
-        self.draw_area.fixed_tracer_time_s = float(tracer_time) if tracer_time is not None else None
+        tracer_ratios = config.get("tracer_ratios")
+        if isinstance(tracer_ratios, list):
+            self.draw_area.tracer_ratios = [
+                max(0.0, min(1.0, float(value)))
+                for value in tracer_ratios[:2]
+                if value is not None
+            ]
+        else:
+            tracer_times = config.get("tracer_times")
+            if isinstance(tracer_times, list):
+                legacy_times = [float(value) for value in tracer_times[:2] if value is not None]
+            else:
+                tracer_time = config.get("tracer_time_s")
+                legacy_times = [float(tracer_time)] if tracer_time is not None else []
+            start_s, end_s = self.draw_area.current_view_range()
+            span = max(0.000001, end_s - start_s)
+            self.draw_area.tracer_ratios = [
+                max(0.0, min(1.0, (timestamp - start_s) / span))
+                for timestamp in legacy_times
+            ]
+        self._tracer_visible = bool(config.get("tracer_visible", bool(self.draw_area.tracer_ratios))) and bool(self.draw_area.tracer_ratios)
+        self._tracer_follow_latest = False
+        start_s, end_s = self.draw_area.current_view_range()
+        self.draw_area.fixed_tracer_time_s = (
+            self.draw_area._ratio_to_time(self.draw_area.tracer_ratios[0], start_s, end_s)
+            if self.draw_area.tracer_ratios
+            else None
+        )
         self._x_unit = config.get("x_unit", "ms") if config.get("x_unit", "ms") in X_UNITS else "ms"
         self._wheel_speed = float(config.get("wheel_speed", 0.20))
         if self._wheel_speed not in WHEEL_SPEEDS:
@@ -966,10 +1287,7 @@ class RealtimePlotWidget(QWidget):
         tracer_menu = menu.addMenu("Tracer标记")
         tracer_menu.setObjectName("plotContextMenu")
         tracer_visible_action = tracer_menu.addAction("显示 Tracer" if not self._tracer_visible else "隐藏 Tracer")
-        tracer_follow_action = tracer_menu.addAction("跟随最新数据")
-        tracer_follow_action.setCheckable(True)
-        tracer_follow_action.setChecked(self._tracer_follow_latest)
-        tracer_fixed_action = tracer_menu.addAction("固定到当前鼠标位置")
+        tracer_fixed_action = tracer_menu.addAction("添加到当前鼠标位置")
         tracer_clear_action = tracer_menu.addAction("清除 Tracer")
         tracer_menu.addSeparator()
         tracer_actions = self._add_exclusive_actions(tracer_menu, TRACER_STYLES, self._tracer_style)
@@ -1004,15 +1322,16 @@ class RealtimePlotWidget(QWidget):
             self._draw_mode = draw_actions[action]
             self.draw_area.update()
         elif action == tracer_visible_action:
-            self._tracer_visible = not self._tracer_visible
-            self.draw_area.update()
-        elif action == tracer_follow_action:
-            self._tracer_follow_latest = tracer_follow_action.isChecked()
-            self._tracer_visible = True
-            self.draw_area.update()
+            if self._tracer_visible:
+                self._tracer_visible = False
+                self.draw_area.update()
+            elif self.draw_area.tracer_ratios:
+                self._tracer_visible = True
+                self.draw_area.update()
+            else:
+                self.draw_area.fix_tracer_to_hover()
         elif action == tracer_fixed_action:
             self._tracer_follow_latest = False
-            self._tracer_visible = True
             self.draw_area.fix_tracer_to_hover()
         elif action == tracer_clear_action:
             self._tracer_visible = False
@@ -1075,6 +1394,12 @@ class RealtimePlotWidget(QWidget):
             marker = "✓ " if self.is_channel_visible(key) else "  "
             self.channel_combo.addItem(f"{marker}{key}", key)
         self.channel_combo.blockSignals(False)
+        self._channel_combo_signature = self._channel_summary_signature()
+
+    def _channel_summary_signature(self):
+        keys = tuple(sorted(self._channels.keys(), key=_channel_sort_key))
+        visible = tuple(self.visible_channel_keys())
+        return keys, visible
 
     def _handle_channel_combo_activated(self, index):
         value = self.channel_combo.itemData(index)
@@ -1132,6 +1457,25 @@ def _decimate_points(points, max_points):
     if decimated[-1] != points[-1]:
         decimated.append(points[-1])
     return decimated
+
+
+def _distance_to_segment(pos, start, end):
+    px = float(pos.x())
+    py = float(pos.y())
+    ax = float(start.x())
+    ay = float(start.y())
+    bx = float(end.x())
+    by = float(end.y())
+    dx = bx - ax
+    dy = by - ay
+    length_sq = dx * dx + dy * dy
+    if length_sq <= 0.000001:
+        return math.hypot(px - ax, py - ay)
+    ratio = ((px - ax) * dx + (py - ay) * dy) / length_sq
+    ratio = max(0.0, min(1.0, ratio))
+    closest_x = ax + ratio * dx
+    closest_y = ay + ratio * dy
+    return math.hypot(px - closest_x, py - closest_y)
 
 
 def _channel_sort_key(key):

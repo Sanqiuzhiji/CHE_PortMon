@@ -713,6 +713,9 @@ class RealtimeWavePlotControl(BasePlotControl):
     def _apply_default_size(self):
         self.resize(760, 420)
 
+    def minimumSizeHint(self):
+        return QSize(260, 180)
+
     def control_config(self):
         config = self.plot_widget.to_dict()
         config["title"] = self.title
@@ -1191,9 +1194,9 @@ class _RealtimePlotConfigDialog(_BaseConfigDialog):
         self.visible_edit = QLineEdit(",".join(config.get("visible_channels", [])), self)
 
         self.time_spin = QDoubleSpinBox(self)
-        self.time_spin.setRange(0.1, 120.0)
-        self.time_spin.setSingleStep(0.5)
-        self.time_spin.setDecimals(1)
+        self.time_spin.setRange(0.001, 120.0)
+        self.time_spin.setSingleStep(0.1)
+        self.time_spin.setDecimals(6)
         self.time_spin.setSuffix(" s")
         self.time_spin.setValue(float(config.get("time_window_s", 10.0)))
 
